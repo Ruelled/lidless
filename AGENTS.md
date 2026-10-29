@@ -11,7 +11,7 @@ Check the state from a shell:
 
 ```sh
 pgrep -lf Lidless.app                          # is it running?
-pmset -g assertions | grep Lidless             # "Lidless session" or "Lidless caffeinate" = active
+pmset -g assertions | grep -E "Lidless|caffeinate"  # "Lidless session" = session; caffeinate = the switch
 pmset -g | grep SleepDisabled                  # 1 = lid-closed mode active
 ```
 

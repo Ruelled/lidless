@@ -9,8 +9,9 @@ laptop is in your bag. It is a free, open-source take on the idea behind
 
 ## Features
 
-- **Caffeinate switch**: keep the Mac and the display awake until you switch it
-  off. Lid open only. Works like `caffeinate -di`.
+- **Caffeinate switch**: runs `/usr/bin/caffeinate -dimsu` until you switch it
+  off or quit Lidless. On mains power, `-s` also keeps the Mac awake with the
+  lid closed. On battery, use a session with lid-closed mode.
 - **Sessions with guardrails**: stop after a time, below a battery percentage
   (on battery only), or at a thermal state (Warm, Hot, Critical).
 - **Lid closed**: optional. Uses `pmset -a disablesleep 1` and turns it off

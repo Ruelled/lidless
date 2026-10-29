@@ -40,7 +40,7 @@ final class Session: ObservableObject {
     @Published var openAtLogin = SMAppService.mainApp.status == .enabled
 
     private var assertions: [IOPMAssertionID] = []
-    private var caffeineAssertions: [IOPMAssertionID] = []
+    private var caffeinate: Process?
     private var watchdog: Process?
     private var wakeObserver: NSObjectProtocol?
     private var timer: Timer?
@@ -152,12 +152,21 @@ final class Session: ObservableObject {
         openAtLogin = SMAppService.mainApp.status == .enabled
     }
 
-    // Caffeinate switch: like `caffeinate -di`, no limits, lid open only. Separate from a session.
+    // Caffeinate switch: runs the real `caffeinate -dimsu`, no limits. Separate from a session.
+    // `-w` ends caffeinate when Lidless exits, also after a crash.
     func setCaffeinated(_ on: Bool) {
-        caffeineAssertions.forEach { IOPMAssertionRelease($0) }
-        caffeineAssertions = on ? [Self.hold(kIOPMAssertionTypePreventUserIdleSystemSleep, "Lidless caffeinate"),
-                                   Self.hold(kIOPMAssertionTypePreventUserIdleDisplaySleep, "Lidless caffeinate")] : []
-        caffeinated = on
+        caffeinate?.terminate()
+        caffeinate = nil
+        if on {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/caffeinate")
+            p.arguments = ["-dimsu", "-w", String(ProcessInfo.processInfo.processIdentifier)]
+            p.terminationHandler = { [weak self] proc in
+                DispatchQueue.main.async { if self?.caffeinate === proc { self?.caffeinate = nil; self?.caffeinated = false } }
+            }
+            do { try p.run(); caffeinate = p } catch { self.error = "caffeinate: \(error.localizedDescription)" }
+        }
+        caffeinated = caffeinate != nil
     }
 
     private static func hold(_ type: String, _ name: String) -> IOPMAssertionID {
@@ -252,7 +261,7 @@ struct Panel: View {
                 Spacer()
                 Toggle("Caffeinate", isOn: Binding(get: { s.caffeinated }, set: { s.setCaffeinated($0) }))
                     .toggleStyle(.switch).controlSize(.small)
-                    .help("Keep the Mac and the display awake until you switch it off. Lid open only.")
+                    .help("Runs caffeinate -dimsu until you switch it off.")
                 Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }
                     .buttonStyle(.borderless).help("Quit (ends the session)")
             }
