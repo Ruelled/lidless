@@ -34,11 +34,11 @@ Test after each change:
 
 ```sh
 ./test.sh                              # unit tests (Tests/main.swift)
-./build.sh && tests/integration.sh     # real sessions, lid mode, crash cleanup
+./build.sh && Tests/integration.sh     # real sessions, lid mode, crash cleanup
 ```
 
 Add a unit test in `Tests/main.swift` for each new pure function, and an
-integration check in `tests/integration.sh` for each new command. Record each
+integration check in `Tests/integration.sh` for each new command. Record each
 change in `CHANGELOG.md`.
 
 Do not use `pmset displaysleepnow` on a desktop setup: it locks the screen and

@@ -18,7 +18,7 @@
   risk. The heat limit is a ceiling for the command line.
 - Settings open in front of the panel.
 - Fewer wake-ups while idle. The log uses local time.
-- Unit tests (`./test.sh`, also in CI) and integration tests (`tests/integration.sh`).
+- Unit tests (`./test.sh`, also in CI) and integration tests (`Tests/integration.sh`).
 
 ## 0.2 — 2026-10-29
 

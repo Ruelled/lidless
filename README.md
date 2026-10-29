@@ -126,7 +126,7 @@ this software at your own risk; see the [license](LICENSE).
 
 ```sh
 ./test.sh               # unit tests; change nothing on the Mac (also run in CI)
-./build.sh && tests/integration.sh   # real sessions against the installed app
+./build.sh && Tests/integration.sh   # real sessions against the installed app
 ```
 
 The integration tests refuse to run while a session or caffeinate is active.
