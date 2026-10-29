@@ -297,7 +297,10 @@ private struct CleanupTab: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Quit these apps when a session starts, to save battery. They can still ask you to save.")
+            Text("Selected apps quit when you start a session, not now. They open again when the session stops.")
+                .bold()
+            Text("This saves battery while the Mac works in a bag. An app with unsaved work can still ask you to save.")
+                .font(.caption).foregroundStyle(.secondary)
             Text("Do not select the app that runs your agent, for example your terminal.")
                 .font(.caption).foregroundStyle(.orange)
             Toggle("Reopen these apps when the session stops", isOn: $reopenApps)

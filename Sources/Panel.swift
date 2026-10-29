@@ -133,7 +133,7 @@ struct Panel: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("App Cleanup")
                         Text(cleanup.ids.isEmpty ? "No apps selected"
-                             : "\(cleanup.ids.count) app\(cleanup.ids.count == 1 ? "" : "s") selected"
+                             : "\(cleanup.ids.count) app\(cleanup.ids.count == 1 ? "" : "s") quit at session start"
                                + (reopenApps ? " · Reopen after session" : ""))
                             .font(.caption).foregroundStyle(.secondary)
                     }
