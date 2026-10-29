@@ -107,7 +107,8 @@ final class Control {
             }
             s.setCaffeinated(on, args: args)
             reply.ok = s.caffeinated == on
-            reply.message = s.caffeinated ? "Caffeinate on (caffeinate \(s.caffeinateArgs.joined(separator: " ")))." : "Caffeinate off."
+            reply.message = s.caffeinated ? "Caffeinate on (caffeinate \(s.caffeinateArgs.joined(separator: " ")))."
+                : (on ? "Caffeinate did not start: \(s.error ?? "unknown error")." : "Caffeinate off.")
         case "settings":
             let tabs: [String: SettingsTab] = ["general": .general, "safety": .safety, "caffeinate": .caffeinate,
                                                "lid": .lid, "cleanup": .cleanup, "agents": .agents]
