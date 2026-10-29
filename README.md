@@ -66,6 +66,10 @@ temperature limit uses the macOS thermal state, and the Mac usually slows
 itself down before it reports "Hot", so do not rely on that limit alone. Use
 this software at your own risk; see the [license](LICENSE).
 
+## For agents
+
+See [AGENTS.md](AGENTS.md) for build commands and shell checks of the state.
+
 ## License
 
 MIT
