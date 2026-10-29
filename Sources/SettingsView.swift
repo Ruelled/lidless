@@ -3,7 +3,7 @@
 import SwiftUI
 import AppKit
 
-enum SettingsTab: Hashable { case general, lid, cleanup, agents }
+enum SettingsTab: Hashable { case general, safety, lid, cleanup, agents }
 
 final class SettingsRouter: ObservableObject {
     static let shared = SettingsRouter()
@@ -34,12 +34,13 @@ struct SettingsView: View {
     var body: some View {
         TabView(selection: $router.tab) {
             GeneralTab().tabItem { Label("General", systemImage: "gearshape") }.tag(SettingsTab.general)
+            SafetyTab().tabItem { Label("Safety", systemImage: "thermometer.medium") }.tag(SettingsTab.safety)
             LidTab().tabItem { Label("Lid", systemImage: "laptopcomputer") }.tag(SettingsTab.lid)
             CleanupTab().tabItem { Label("App Cleanup", systemImage: "xmark.app") }.tag(SettingsTab.cleanup)
             AgentsTab().tabItem { Label("Agents", systemImage: "terminal") }.tag(SettingsTab.agents)
         }
         .padding(20)
-        .frame(width: 560, height: 440)
+        .frame(width: 580, height: 560)
     }
 }
 
@@ -93,6 +94,84 @@ private struct GeneralTab: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+// MARK: - Safety (the heat limit and why it exists)
+
+private struct SafetyTab: View {
+    @ObservedObject private var s = Session.shared
+    @AppStorage(Pref.useThermal) private var useThermal = true
+    @AppStorage(Pref.thermalLimit) private var thermalLimit = 2
+    @State private var confirmOff = false
+
+    private static let levels: [(name: String, meaning: String)] = [
+        ("Normal", "No action. The Mac runs at full speed."),
+        ("Warm", "Fans speed up and macOS cuts background work."),
+        ("Hot", "macOS slows the processor down to cool the Mac."),
+        ("Critical", "macOS cuts speed as far as it can. Next step: emergency shutdown."),
+    ]
+
+    var body: some View {
+        Form {
+            Section("Heat limit") {
+                Toggle("Stop the session at a heat level", isOn: Binding(
+                    get: { useThermal },
+                    set: { on in if on { useThermal = true } else { confirmOff = true } }))
+                Picker("Stop at", selection: $thermalLimit) {
+                    Text("Warm — conservative").tag(1)
+                    Text("Hot — recommended").tag(2)
+                    Text("Critical — last resort").tag(3)
+                }
+                .disabled(!useThermal)
+                if !useThermal {
+                    Text("No heat limit. Only the time and battery limits protect the Mac. Not recommended.")
+                        .font(.caption).foregroundStyle(.red)
+                } else if thermalLimit == 3 {
+                    Text("At Critical the Mac is already as hot as macOS permits. Use Hot unless you have a reason.")
+                        .font(.caption).foregroundStyle(.orange)
+                }
+                Text("This limit is also a ceiling for agents: `lidless start --thermal-stop` can make it "
+                     + "stricter, not weaker.").font(.caption).foregroundStyle(.secondary)
+                LabeledContent("Now", value: thermalName(s.thermal))
+            }
+            Section("What the levels mean") {
+                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
+                    ForEach(Array(Self.levels.enumerated()), id: \.offset) { i, level in
+                        GridRow {
+                            Text(level.name).bold().foregroundStyle(i == s.thermal ? Color.accentColor : .primary)
+                            Text(level.meaning).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                Text("Lidless reads the level that macOS reports (ProcessInfo.thermalState), not a temperature "
+                     + "in degrees. macOS slows the Mac down before it reports Hot, so set a battery limit "
+                     + "and a time limit too.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Section("When heat is a risk") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("• A closed Mac in a bag, a sleeve, on a bed or under a blanket: no air flows, so heat builds up.")
+                    Text("• Heavy work for a long time: builds, tests, local AI models, video export.")
+                    Text("• Charging while hot: heat together with a full charge wears the battery fastest.")
+                    Text("• A hot room, a car or direct sun. Apple gives 10–35 °C as the range to use a Mac in.")
+                    Text("• A MacBook Air has no fan, so it slows down sooner and stays warm longer.")
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                Text("macOS protects the Mac itself: it slows down and, at the end, shuts down. The main risk of "
+                     + "repeated heat is faster battery wear. Damage or a swollen battery is rare, but it is not "
+                     + "worth the risk.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .formStyle(.grouped)
+        .alert("Turn off the heat limit?", isPresented: $confirmOff) {
+            Button("Turn Off", role: .destructive) { useThermal = false }
+            Button("Keep It On", role: .cancel) {}
+        } message: {
+            Text("A session will then continue while the Mac is hot, for example in a closed bag. "
+                 + "Only the time and battery limits will stop it.")
+        }
     }
 }
 

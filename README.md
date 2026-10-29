@@ -44,6 +44,14 @@ To update: `git pull && ./build.sh`, then quit Lidless and open it again.
 Settings > General can check GitHub for a newer commit once a day. That is
 the only network request Lidless makes.
 
+## Heat safety
+
+Settings > Safety explains the four macOS heat levels (Normal, Warm, Hot,
+Critical), when heat is a risk for a Mac, and holds the heat limit. Hot is the
+default and the recommended level. To turn the limit off, you must confirm.
+The limit is also a ceiling for the command line: an agent can make it
+stricter, not weaker.
+
 ## Command line
 
 ```sh

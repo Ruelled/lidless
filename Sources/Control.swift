@@ -77,13 +77,21 @@ final class Control {
             var c = Pref.config()
             if let v = info["duration"] as? Int { c.endsAfter = v > 0 ? TimeInterval(v) : nil }
             if let v = info["battery"] as? Int { c.batteryFloor = v > 0 ? v : nil }
-            if let v = info["thermal"] as? Int { c.thermalLimit = v > 0 ? v : nil }
+            var note = ""
+            if let v = info["thermal"] as? Int {
+                // The user's heat limit is a ceiling: a command can make it stricter, not weaker.
+                if let mine = c.thermalLimit, v == 0 || v > mine {
+                    note = " Heat limit kept at \(thermalName(mine)), the user's setting."
+                } else {
+                    c.thermalLimit = v > 0 ? v : nil
+                }
+            }
             if let v = info["lid"] as? Bool { c.lidClosed = v }
             if let e = s.start(c, by: info["by"] as? String ?? "cli") {
                 reply.ok = false
                 reply.message = e
             } else {
-                reply.message = "Session started: \(s.summary)."
+                reply.message = "Session started: \(s.summary)." + note
             }
         case "stop":
             reply.message = s.stop(info["reason"] as? String ?? "Stopped from the command line")

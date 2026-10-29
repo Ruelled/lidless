@@ -69,13 +69,20 @@ struct Panel: View {
                     Text("Now: \(batteryNow)").foregroundStyle(.secondary)
                 }
                 GridRow {
-                    Text("Temperature")
+                    HStack(spacing: 4) {
+                        Text("Temperature")
+                        Button { SettingsWindow.show(.safety) } label: { Image(systemName: "info.circle") }
+                            .buttonStyle(.borderless).help("What the heat levels mean")
+                    }
                     Toggle("Stop at", isOn: $useThermal)
                     Picker("", selection: $thermalLimit) {
                         ForEach(1...3, id: \.self) { Text(thermalName($0)).tag($0) }
                     }.labelsHidden().disabled(!useThermal)
                     Text("Now: \(thermalName(s.thermal))").foregroundStyle(.secondary)
                 }
+            }
+            if !useThermal {
+                Text("No heat limit. Not recommended.").font(.caption).foregroundStyle(.red)
             }
             Divider()
             Button { SettingsWindow.show(.cleanup) } label: {

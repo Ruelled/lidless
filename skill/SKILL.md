@@ -21,6 +21,8 @@ lidless start --duration 2h --battery-floor 20 --thermal-stop hot --by <your age
   permission. If it is missing, the command fails and tells you so. Then tell the user
   to open Lidless Settings > Lid.
 - Durations: `30m`, `2h`, `1h30m`. Thermal stops: `warm`, `hot`, `critical`.
+- The user's heat limit is a ceiling. A weaker `--thermal-stop` (or `none`) is
+  ignored, and the reply says so. Do not try to work around it.
 - If a session is already active, `start` fails. Run `lidless status` and do not stop
   a session that the user or another agent started.
 
