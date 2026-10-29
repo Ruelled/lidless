@@ -42,6 +42,7 @@ enum MenuPanel {
 
 struct Panel: View {
     @ObservedObject var s: Session
+    @ObservedObject private var caffeinate = Caffeinate.shared
     @ObservedObject private var cleanup = CleanupList.shared
     @ObservedObject private var updates = Updates.shared
     @AppStorage(Pref.useDuration) private var useDuration = true
@@ -73,9 +74,9 @@ struct Panel: View {
             Image(systemName: "figure.walk")
             Text("Lidless").font(.title3.bold())
             Spacer()
-            Toggle("Caffeinate", isOn: Binding(get: { s.caffeinated }, set: { s.setCaffeinated($0) }))
+            Toggle("Caffeinate", isOn: Binding(get: { caffeinate.on }, set: { caffeinate.set($0) }))
                 .toggleStyle(.switch).controlSize(.small)
-                .help("Runs caffeinate \(Session.savedCaffeinateArgs().joined(separator: " ")). "
+                .help("Runs caffeinate \(Caffeinate.savedArgs().joined(separator: " ")). "
                       + "Change it in Settings > Caffeinate.")
             Button { SettingsWindow.show() } label: {
                 Image(systemName: updates.available ? "gearshape.arrow.triangle.2.circlepath" : "gearshape")
@@ -168,7 +169,7 @@ struct Panel: View {
                 }
             }
 
-            if let e = s.error { Text(e).font(.caption).foregroundStyle(.red) }
+            if let e = s.error ?? caffeinate.error { Text(e).font(.caption).foregroundStyle(.red) }
             if let l = s.lastStop { Text("Last session: \(l)").font(.caption).foregroundStyle(.secondary) }
 
             Button { s.start(Pref.config()) } label: {
@@ -209,7 +210,7 @@ struct Panel: View {
                 if s.holders != ["panel"] {
                     GridRow {
                         Text(s.holders.count > 1 ? "Held by" : "Started by").foregroundStyle(.secondary)
-                        Text(s.holders.joined(separator: ", ")).lineLimit(1)
+                        Text(s.holderList).lineLimit(1)
                         Text("")
                     }
                 }

@@ -19,12 +19,16 @@ session is active, restore normal sleep with `sudo pmset -a disablesleep 0`.
 ## To change it
 
 - `Sources/App.swift`: entry point. A known command runs the CLI, else the app.
-- `Sources/Session.swift`: sessions, guardrails, lid sleep, caffeinate switch.
-- `Sources/Control.swift`: CLI, distributed-notification commands, `state.json`.
-- `Sources/System.swift`: pmset/sudo, brightness, App Cleanup, notifications, log.
-- `Sources/Integrations.swift`: update check, `lidless` wrapper, skill install.
+- `Sources/Session.swift`: sessions, holders, guardrails, sensors.
+- `Sources/Lid.swift`: `pmset disablesleep`, the sudoers rule, the crash watchdog.
+- `Sources/Caffeinate.swift`: the Caffeinate switch (`/usr/bin/caffeinate`).
+- `Sources/Control.swift`: the app side of commands, and `state.json`.
+- `Sources/CLI.swift`: the `lidless` command line.
+- `Sources/System.swift`: shell, brightness, App Cleanup, notifications, log.
+- `Sources/Integrations.swift`: open at login, update check, `lidless` wrapper, skills.
 - `Sources/Panel.swift`, `Sources/SettingsView.swift`: the UI.
 - `Sources/Prefs.swift`: saved settings and their defaults.
+- `Sources/Format.swift`: text for the UI, the log and the command line.
 - `skill/SKILL.md`: the agent skill, copied into the app bundle.
 
 Build: `./build.sh` (installs) or `./build.sh --no-install` (CI). macOS 13+,

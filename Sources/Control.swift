@@ -72,79 +72,70 @@ final class Control {
 
     private func handle(_ info: [AnyHashable: Any]) {
         guard let id = info["id"] as? String, let cmd = info["cmd"] as? String else { return }
-        let s = Session.shared
-        var reply = Reply(id: id, ok: true, message: "")
+        let (ok, message): (Bool, String)
         switch cmd {
-        case "start":
-            var c = Pref.config()
-            if let v = info["duration"] as? Int { c.endsAfter = v > 0 ? TimeInterval(v) : nil }
-            if let v = info["battery"] as? Int { c.batteryFloor = v > 0 ? v : nil }
-            var note = ""
-            if let v = info["thermal"] as? Int {
-                // The user's heat limit is a ceiling: a command can make it stricter, not weaker.
-                if let mine = c.thermalLimit, v == 0 || v > mine {
-                    note = " Heat limit kept at \(thermalName(mine)), the user's setting."
-                } else {
-                    c.thermalLimit = v > 0 ? v : nil
-                }
-            }
-            if let v = info["lid"] as? Bool { c.lidClosed = v }
-            // Do not let App Cleanup quit the app that sent the command (the agent's terminal or editor).
-            if let protect = info["protect"] as? [String] {
-                let before = c.cleanupApps.count
-                c.cleanupApps.removeAll { protect.contains($0) }
-                if c.cleanupApps.count < before { note += " App Cleanup kept the app that sent this command open." }
-            }
-            let by = info["by"] as? String ?? "cli"
-            if s.active {
-                if let e = s.join(c, by: by) {
-                    reply.ok = false
-                    reply.message = e
-                } else {
-                    let f = DateFormatter()
-                    f.timeStyle = .short
-                    reply.message = "Joined the active session. Holders: \(s.holders.joined(separator: ", "))."
-                        + (s.endsAt.map { " It ends at \(f.string(from: $0))." } ?? "") + note
-                }
-            } else if let e = s.start(c, by: by) {
-                reply.ok = false
-                reply.message = e
-            } else {
-                reply.message = "Session started: \(s.summary)." + note
-            }
-        case "stop":
-            if let by = info["by"] as? String {
-                let r = s.release(by)
-                reply.ok = r.ok
-                reply.message = r.message
-            } else {
-                reply.message = s.stop("Stopped from the command line") ? "Session stopped." : "No session was active."
-            }
-        case "caffeinate":
-            let on = info["on"] as? Bool ?? false
-            var args: [String]?
-            if on, info["flags"] != nil || info["seconds"] != nil {
-                let saved = Session.savedCaffeinateArgs()
-                let flags = (info["flags"] as? String).map { "-" + $0 } ?? saved[0]
-                let secs = info["seconds"] as? Int
-                args = [flags] + (secs.map { $0 > 0 ? ["-t", String($0)] : [] } ?? Array(saved.dropFirst()))
-            }
-            s.setCaffeinated(on, args: args)
-            reply.ok = s.caffeinated == on
-            reply.message = s.caffeinated ? "Caffeinate on (caffeinate \(s.caffeinateArgs.joined(separator: " ")))."
-                : (on ? "Caffeinate did not start: \(s.error ?? "unknown error")." : "Caffeinate off.")
-        case "settings":
-            let tabs: [String: SettingsTab] = ["general": .general, "safety": .safety, "caffeinate": .caffeinate,
-                                               "lid": .lid, "cleanup": .cleanup, "agents": .agents]
-            let name = info["tab"] as? String ?? "general"
-            if let tab = tabs[name] { SettingsWindow.show(tab); reply.message = "Settings opened." }
-            else { reply.ok = false; reply.message = "Unknown tab \(name). Tabs: \(tabs.keys.sorted().joined(separator: ", "))." }
-        default:
-            reply.ok = false
-            reply.message = "Unknown command: \(cmd)"
+        case "start": (ok, message) = start(info)
+        case "stop": (ok, message) = stop(info)
+        case "caffeinate": (ok, message) = caffeinate(info)
+        case "settings": (ok, message) = settings(info)
+        default: (ok, message) = (false, "Unknown command: \(cmd)")
         }
-        lastReply = reply
+        lastReply = Reply(id: id, ok: ok, message: message)
         writeState()
+    }
+
+    private func start(_ info: [AnyHashable: Any]) -> (Bool, String) {
+        let s = Session.shared
+        var c = Pref.config()
+        var note = ""
+        if let v = info["duration"] as? Int { c.endsAfter = v > 0 ? TimeInterval(v) : nil }
+        if let v = info["battery"] as? Int { c.batteryFloor = v > 0 ? v : nil }
+        if let v = info["thermal"] as? Int {
+            // The user's heat limit is a ceiling: a command can make it stricter, not weaker.
+            if let mine = c.thermalLimit, v == 0 || v > mine {
+                note += " Heat limit kept at \(thermalName(mine)), the user's setting."
+            } else {
+                c.thermalLimit = v > 0 ? v : nil
+            }
+        }
+        if let v = info["lid"] as? Bool { c.lidClosed = v }
+        // Do not let App Cleanup quit the app that sent the command (the agent's terminal or editor).
+        if let protect = info["protect"] as? [String] {
+            let before = c.cleanupApps.count
+            c.cleanupApps.removeAll { protect.contains($0) }
+            if c.cleanupApps.count < before { note += " App Cleanup kept the app that sent this command open." }
+        }
+        let by = info["by"] as? String ?? "cli"
+        if s.active {
+            if let e = s.join(c, by: by) { return (false, e) }
+            return (true, "Joined the active session. Holders: \(s.holderList)."
+                    + (s.endsAt.map { " It ends at \(shortTime($0))." } ?? "") + note)
+        }
+        if let e = s.start(c, by: by) { return (false, e) }
+        return (true, "Session started: \(s.summary)." + note)
+    }
+
+    private func stop(_ info: [AnyHashable: Any]) -> (Bool, String) {
+        if let by = info["by"] as? String { return Session.shared.release(by) }
+        return (true, Session.shared.stop("Stopped from the command line") ? "Session stopped." : "No session was active.")
+    }
+
+    private func caffeinate(_ info: [AnyHashable: Any]) -> (Bool, String) {
+        let c = Caffeinate.shared
+        let on = info["on"] as? Bool ?? false
+        let custom = info["flags"] != nil || info["seconds"] != nil
+        c.set(on, args: on && custom ? Caffeinate.args(flags: info["flags"] as? String, seconds: info["seconds"] as? Int) : nil)
+        if c.on == on { return (true, on ? "Caffeinate on (\(c.command))." : "Caffeinate off.") }
+        return (false, "Caffeinate did not start: \(c.error ?? "unknown error").")
+    }
+
+    private func settings(_ info: [AnyHashable: Any]) -> (Bool, String) {
+        let name = info["tab"] as? String ?? SettingsTab.general.rawValue
+        guard let tab = SettingsTab(rawValue: name) else {
+            return (false, "Unknown tab \(name). Tabs: \(SettingsTab.allCases.map(\.rawValue).joined(separator: ", ")).")
+        }
+        SettingsWindow.show(tab)
+        return (true, "Settings opened.")
     }
 
     func writeState(running: Bool = true) {
@@ -152,240 +143,14 @@ final class Control {
         let c = s.active ? s.config : nil
         let state = LidlessState(
             running: running, pid: ProcessInfo.processInfo.processIdentifier, active: s.active,
-            startedBy: c == nil ? nil : s.startedBy, holders: c == nil ? nil : s.holders, startedAt: c == nil ? nil : s.startedAt, endsAt: s.endsAt.flatMap { c == nil ? nil : $0 },
+            startedBy: c == nil ? nil : s.startedBy, holders: c == nil ? nil : s.holders,
+            startedAt: c == nil ? nil : s.startedAt, endsAt: c == nil ? nil : s.endsAt,
             batteryFloor: c?.batteryFloor, thermalStop: c?.thermalLimit.map { thermalName($0).lowercased() },
-            lidClosed: c?.lidClosed ?? false, caffeinated: s.caffeinated, battery: s.battery, onAC: s.onAC,
+            lidClosed: c?.lidClosed ?? false, caffeinated: Caffeinate.shared.on, battery: s.battery, onAC: s.onAC,
             thermal: thermalName(s.thermal).lowercased(), lidPermission: s.lidPermission,
             sleepDisabled: Lid.sleepDisabled(), lastStop: s.lastStop, lastCommand: lastReply, updatedAt: Date())
         try? FileManager.default.createDirectory(at: Paths.support, withIntermediateDirectories: true)
         if let data = try? LidlessState.encoder.encode(state) { try? data.write(to: Paths.state, options: .atomic) }
         lastWrite = Date()
-    }
-}
-
-// MARK: - Command line
-
-enum CLI {
-    static let commands: Set<String> = ["start", "stop", "status", "caffeinate", "settings", "version", "help", "--help", "-h", "--version"]
-
-    static let usage = """
-    Usage: lidless <command> [options]
-
-    Commands:
-      start [options]        Start a session with guardrails, or join the active one.
-        --duration <t>         30m, 2h, 1h30m, or none. Default: the saved panel setting.
-        --battery-floor <n>    Stop below n percent on battery (5-95), or none.
-        --thermal-stop <s>     warm, hot, critical, or none.
-        --lid / --no-lid       Allow the lid to close (needs the lid permission).
-        --by <name>            Who holds it, for example codex or claude.
-      stop [--by <name>]     With --by: leave the session; it ends when no holder is left.
-                             Without --by: stop the session for everyone.
-      status                 Show the state. Add --json for machine output.
-      caffeinate on|off      Switch caffeinate on or off. No battery or heat limits.
-        --flags <letters>      For this run only: any of d i m s u. Default: Settings > Caffeinate.
-        --for <t>              For this run only: stop after t (30m, 2h), or none.
-      settings [tab]         Open Settings: general, safety, caffeinate, lid, cleanup, agents.
-      version                Show the version.
-
-    Add --json to any command to print the full state as JSON.
-    Exit codes: 0 success, 1 failure, 2 usage error.
-    """
-
-    static func run(_ args: [String]) -> Int32 {
-        let json = args.contains("--json")
-        let rest = Array(args.dropFirst()).filter { $0 != "--json" }
-        switch args[0] {
-        case "start":
-            guard var info = parseStart(rest) else { return 2 }
-            info["cmd"] = "start"
-            info["protect"] = callerApps()
-            return send(info, json: json)
-        case "stop":
-            if rest.isEmpty { return send(["cmd": "stop"], json: json) }
-            guard rest.count == 2, rest[0] == "--by" else { return usageError("stop takes only --by <name>") }
-            return send(["cmd": "stop", "by": String(rest[1].lowercased().prefix(40))], json: json)
-        case "caffeinate":
-            guard let v = rest.first, v == "on" || v == "off" else { return usageError("caffeinate needs on or off") }
-            var info: [String: Any] = ["cmd": "caffeinate", "on": v == "on"]
-            var i = 1
-            while i < rest.count {
-                let opt = rest[i]
-                i += 1
-                guard i < rest.count else { return usageError("\(opt) needs a value") }
-                let val = rest[i].lowercased()
-                i += 1
-                switch opt {
-                case "--flags":
-                    guard let f = normalizedFlags(val.trimmingCharacters(in: CharacterSet(charactersIn: "-"))) else {
-                        return usageError("--flags takes letters from dimsu, for example dimsu or di")
-                    }
-                    info["flags"] = f
-                case "--for":
-                    guard let secs = parseDuration(val) else { return usageError("bad --for (at most 24h)") }
-                    info["seconds"] = secs
-                default:
-                    return usageError("unknown option \(opt)")
-                }
-            }
-            return send(info, json: json)
-        case "settings":
-            return send(["cmd": "settings", "tab": rest.first ?? "general"], json: json)
-        case "status":
-            return status(json: json)
-        case "version", "--version":
-            let info = Bundle.main.infoDictionary ?? [:]
-            print("lidless \(info["CFBundleShortVersionString"] as? String ?? "?") (\(info["LidlessCommit"] as? String ?? "unknown"))")
-            return 0
-        default:
-            print(usage)
-            return 0
-        }
-    }
-
-    private static func parseStart(_ a: [String]) -> [String: Any]? {
-        var info: [String: Any] = [:]
-        var i = 0
-        func value() -> String? { i += 1; return i < a.count ? a[i].lowercased() : nil }
-        while i < a.count {
-            switch a[i] {
-            case "--duration":
-                guard let v = value(), let secs = parseDuration(v) else { usageError("bad --duration (at most 24h)"); return nil }
-                info["duration"] = secs
-            case "--battery-floor":
-                guard let v = value() else { usageError("bad --battery-floor"); return nil }
-                if v == "none" { info["battery"] = 0 }
-                else if let n = Int(v.trimmingCharacters(in: CharacterSet(charactersIn: "%"))), (5...95).contains(n) { info["battery"] = n }
-                else { usageError("bad --battery-floor"); return nil }
-            case "--thermal-stop":
-                guard let v = value(), let n = ["none": 0, "warm": 1, "hot": 2, "critical": 3][v] else {
-                    usageError("bad --thermal-stop"); return nil
-                }
-                info["thermal"] = n
-            case "--lid": info["lid"] = true
-            case "--no-lid": info["lid"] = false
-            case "--by":
-                guard let v = value() else { usageError("bad --by"); return nil }
-                info["by"] = String(v.prefix(40))
-            default:
-                usageError("unknown option \(a[i])"); return nil
-            }
-            i += 1
-        }
-        return info
-    }
-
-    static let maxDuration = 24 * 3600
-
-    /// "30m", "2h", "1h30m", "45s", "90" (minutes), "none"/"0" → seconds (0 = no limit). At most 24 hours.
-    static func parseDuration(_ s: String) -> Int? {
-        if s == "none" || s == "0" { return 0 }
-        if let m = Int(s) { return m > 0 && m * 60 <= maxDuration ? m * 60 : nil }
-        var total = 0, num = ""
-        for ch in s {
-            if ch.isNumber { num.append(ch); continue }
-            guard let n = Int(num), let unit = ["h": 3600, "m": 60, "s": 1][String(ch)] else { return nil }
-            total += n * unit
-            num = ""
-        }
-        return num.isEmpty && total > 0 && total <= maxDuration ? total : nil
-    }
-
-    /// Bundle identifiers of the apps above this process, for example Terminal or the editor of an agent.
-    static func callerApps() -> [String] {
-        var ids: [String] = []
-        var pid = getppid()
-        for _ in 0..<32 where pid > 1 {
-            if let id = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier { ids.append(id) }
-            var info = proc_bsdinfo()
-            guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, Int32(MemoryLayout<proc_bsdinfo>.size)) > 0 else { break }
-            pid = pid_t(info.pbi_ppid)
-        }
-        return ids
-    }
-
-    @discardableResult
-    private static func usageError(_ message: String) -> Int32 {
-        FileHandle.standardError.write(Data("lidless: \(message)\n\n\(usage)\n".utf8))
-        return 2
-    }
-
-    private static func fail(_ message: String) -> Int32 {
-        FileHandle.standardError.write(Data("lidless: \(message)\n".utf8))
-        return 1
-    }
-
-    /// True if the process exists and is Lidless. After a crash, macOS can give the old pid to another process.
-    private static func alive(_ pid: Int32) -> Bool {
-        guard pid > 0, kill(pid, 0) == 0 else { return false }
-        var path = [CChar](repeating: 0, count: 4096)
-        guard proc_pidpath(pid, &path, UInt32(path.count)) > 0 else { return true }
-        return String(cString: path).hasSuffix("/Contents/MacOS/Lidless")
-    }
-
-    private static func liveState() -> LidlessState? {
-        guard let s = LidlessState.read(), s.running, alive(s.pid) else { return nil }
-        return s
-    }
-
-    private static func ensureRunning() -> Bool {
-        if liveState() != nil { return true }
-        let app = Bundle.main.bundleURL
-        guard app.pathExtension == "app" else { return false }
-        let launched = Date().addingTimeInterval(-1)
-        Shell.run("/usr/bin/open", ["-g", app.path])
-        for _ in 0..<100 {
-            if let s = liveState(), s.updatedAt >= launched { return true }
-            usleep(100_000)
-        }
-        return false
-    }
-
-    private static func send(_ info: [String: Any], json: Bool) -> Int32 {
-        guard ensureRunning() else { return fail("Lidless is not running and did not start. Open ~/Applications/Lidless.app.") }
-        let id = UUID().uuidString
-        var payload = info
-        payload["id"] = id
-        DistributedNotificationCenter.default().postNotificationName(
-            commandNotification, object: nil, userInfo: payload, deliverImmediately: true)
-        for _ in 0..<100 {
-            if let s = LidlessState.read(), let r = s.lastCommand, r.id == id {
-                if json { printJSON(s) } else { print(r.message) }
-                return r.ok ? 0 : 1
-            }
-            usleep(100_000)
-        }
-        return fail("No answer from Lidless within 10 seconds.")
-    }
-
-    private static func printJSON(_ s: LidlessState) {
-        if let d = try? LidlessState.encoder.encode(s) { print(String(decoding: d, as: UTF8.self)) }
-    }
-
-    private static func status(json: Bool) -> Int32 {
-        guard var s = LidlessState.read() else {
-            if json { print("{\"running\": false}") } else { print("Lidless: not running") }
-            return 0
-        }
-        s.running = s.running && alive(s.pid)
-        if json { printJSON(s); return 0 }
-        guard s.running else { print("Lidless: not running"); return 0 }
-        let t = DateFormatter()
-        t.timeStyle = .short
-        print("Lidless: running (pid \(s.pid))")
-        if s.active {
-            var line = "Session: active, started by \(s.startedBy ?? "?")"
-            if let a = s.startedAt { line += " at \(t.string(from: a))" }
-            if let e = s.endsAt { line += ", \(clock(e.timeIntervalSinceNow)) left" }
-            print(line)
-            print("Limits: battery \(s.batteryFloor.map { "below \($0)%" } ?? "none"), "
-                  + "heat \(s.thermalStop ?? "none"), lid \(s.lidClosed ? "may close" : "open")")
-        } else {
-            print("Session: none" + (s.lastStop.map { " (last: \($0))" } ?? ""))
-        }
-        print("Battery: \(s.battery.map { "\($0)%" } ?? "?")\(s.onAC ? " on mains power" : " on battery")"
-              + ", temperature: \(s.thermal)")
-        print("Caffeinate: \(s.caffeinated ? "on" : "off")")
-        print("Lid permission: \(s.lidPermission ? "granted" : "not granted"), SleepDisabled: \(s.sleepDisabled ? 1 : 0)")
-        return 0
     }
 }

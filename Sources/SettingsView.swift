@@ -3,7 +3,8 @@
 import SwiftUI
 import AppKit
 
-enum SettingsTab: Hashable { case general, safety, caffeinate, lid, cleanup, agents }
+/// The raw value is the name for `lidless settings <tab>`.
+enum SettingsTab: String, CaseIterable { case general, safety, caffeinate, lid, cleanup, agents }
 
 final class SettingsRouter: ObservableObject {
     static let shared = SettingsRouter()
@@ -55,7 +56,7 @@ private func copy(_ text: String) {
 // MARK: - General
 
 private struct GeneralTab: View {
-    @ObservedObject private var s = Session.shared
+    @ObservedObject private var login = LoginItem.shared
     @ObservedObject private var u = Updates.shared
     @AppStorage(Pref.notifications) private var notifications = true
     @AppStorage(Pref.autoUpdate) private var autoUpdate = true
@@ -63,8 +64,9 @@ private struct GeneralTab: View {
     var body: some View {
         Form {
             Section("Startup") {
-                Toggle("Open at login", isOn: Binding(get: { s.openAtLogin }, set: { s.setOpenAtLogin($0) }))
+                Toggle("Open at login", isOn: Binding(get: { login.enabled }, set: { login.set($0) }))
                 Text("Also cleans up after a crash, at the next login.").font(.caption).foregroundStyle(.secondary)
+                if let e = login.error { Text(e).font(.caption).foregroundStyle(.red) }
             }
             Section("Notifications") {
                 Toggle("Notify when a session starts or stops", isOn: $notifications)
@@ -181,7 +183,7 @@ private struct SafetyTab: View {
 // MARK: - Caffeinate (which flags the switch passes to /usr/bin/caffeinate)
 
 private struct CaffeinateTab: View {
-    @ObservedObject private var s = Session.shared
+    @ObservedObject private var caffeinate = Caffeinate.shared
     @AppStorage(Pref.caffeinateFlags) private var flags = "dimsu"
     @AppStorage(Pref.caffeinateMinutes) private var minutes = 0
 
@@ -196,13 +198,13 @@ private struct CaffeinateTab: View {
     private static let presets = [("dimsu", "Everything"), ("dims", "No wake"), ("di", "Display and idle"), ("i", "Idle only")]
 
     private var command: String {
-        "caffeinate " + Session.savedCaffeinateArgs().joined(separator: " ") + " -w <Lidless pid>"
+        "caffeinate " + Caffeinate.savedArgs().joined(separator: " ") + " -w <Lidless pid>"
     }
 
     private func binding(_ letter: Character) -> Binding<Bool> {
         Binding(get: { flags.contains(letter) }, set: { on in
             let next = on ? flags + String(letter) : flags.replacingOccurrences(of: String(letter), with: "")
-            if let f = normalizedFlags(next) { flags = f; s.restartCaffeinateIfOn() }
+            if let f = Caffeinate.normalize(next) { flags = f; caffeinate.restartIfOn() }
         })
     }
 
@@ -222,7 +224,7 @@ private struct CaffeinateTab: View {
                 HStack {
                     Text("Presets").foregroundStyle(.secondary)
                     ForEach(Self.presets, id: \.0) { p in
-                        Button("\(p.1) (-\(p.0))") { flags = p.0; s.restartCaffeinateIfOn() }
+                        Button("\(p.1) (-\(p.0))") { flags = p.0; caffeinate.restartIfOn() }
                             .controlSize(.small)
                     }
                 }
@@ -232,12 +234,12 @@ private struct CaffeinateTab: View {
                     Text("Never").tag(0)
                     ForEach(Pref.durations, id: \.self) { Text(durationName($0)).tag($0) }
                 }
-                .onChange(of: minutes) { _ in s.restartCaffeinateIfOn() }
+                .onChange(of: minutes) { _ in caffeinate.restartIfOn() }
             }
             Section("Command") {
                 Text(command).font(.system(.callout, design: .monospaced)).textSelection(.enabled)
                 Text("`-w` ends caffeinate when Lidless quits or crashes. "
-                     + (s.caffeinated ? "Caffeinate is on: changes apply at once." : "Caffeinate is off."))
+                     + (caffeinate.on ? "Caffeinate is on: changes apply at once." : "Caffeinate is off."))
                     .font(.caption).foregroundStyle(.secondary)
                 Text("The switch has no battery or heat limits. For a Mac in a bag, use a session.")
                     .font(.caption).foregroundStyle(.orange)

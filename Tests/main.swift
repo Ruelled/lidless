@@ -32,11 +32,17 @@ check(CLI.parseDuration("30m5"), nil, "number without unit at the end")
 check(CLI.parseDuration("-5"), nil, "negative")
 
 // caffeinate flags.
-check(normalizedFlags("dimsu"), "dimsu", "all flags")
-check(normalizedFlags("usd"), "dsu", "canonical order")
-check(normalizedFlags("dd"), "d", "duplicate")
-check(normalizedFlags(""), nil, "empty")
-check(normalizedFlags("dx"), nil, "unknown letter")
+check(Caffeinate.normalize("dimsu"), "dimsu", "all flags")
+check(Caffeinate.normalize("usd"), "dsu", "canonical order")
+check(Caffeinate.normalize("dd"), "d", "duplicate")
+check(Caffeinate.normalize(""), nil, "empty")
+check(Caffeinate.normalize("dx"), nil, "unknown letter")
+check(Caffeinate.args(flags: "di", seconds: 1800), ["-di", "-t", "1800"], "args with a time limit")
+check(Caffeinate.args(flags: "dimsu", seconds: 0), ["-dimsu"], "args without a time limit")
+
+// Settings tabs, also the names for `lidless settings <tab>`.
+check(SettingsTab(rawValue: "safety"), .safety, "tab by name")
+check(SettingsTab(rawValue: "nope"), nil, "unknown tab")
 
 // Formatting.
 check(shortDuration(1800), "30m", "30m")
@@ -47,6 +53,7 @@ check(clock(-5), "00:00:00", "negative clock")
 check(thermalName(-1), "Normal", "thermal below range")
 check(thermalName(2), "Hot", "thermal")
 check(thermalName(9), "Critical", "thermal above range")
+check(sentence("stops after 2h"), "Stops after 2h.", "sentence")
 
 // Session summary.
 let c = Config(endsAfter: 7200, batteryFloor: 20, thermalLimit: 2, lidClosed: true, keepDisplay: false,

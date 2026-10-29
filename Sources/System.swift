@@ -1,4 +1,4 @@
-// Thin wrappers around macOS: shell commands, lid sleep, brightness, apps, notifications, log.
+// Thin wrappers around macOS: shell commands, brightness, apps, notifications, log.
 
 import AppKit
 import CoreGraphics
@@ -18,49 +18,6 @@ enum Shell {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         p.waitUntilExit()
         return (p.terminationStatus, String(decoding: data, as: UTF8.self))
-    }
-}
-
-// MARK: - Lid sleep (pmset disablesleep, through a sudoers rule for that one command)
-
-enum Lid {
-    static let pmset = "/usr/bin/pmset"
-    static let sudoersFile = "/etc/sudoers.d/lidless"
-    static let flag = "lidSleepDisabledByLidless"   // set while Lidless owns SleepDisabled = 1
-
-    static var rule: String {
-        "\(NSUserName()) ALL=(root) NOPASSWD: \(pmset) -a disablesleep 0, \(pmset) -a disablesleep 1"
-    }
-
-    @discardableResult
-    static func setDisableSleep(_ on: Bool) -> Bool {
-        Shell.run("/usr/bin/sudo", ["-n", pmset, "-a", "disablesleep", on ? "1" : "0"]).status == 0
-    }
-
-    static func canDisableSleep() -> Bool {
-        Shell.run("/usr/bin/sudo", ["-n", "-l", pmset, "-a", "disablesleep", "1"]).status == 0
-    }
-
-    static func sleepDisabled() -> Bool {
-        Shell.run(pmset, ["-g"]).output.split(separator: "\n").contains {
-            $0.contains("SleepDisabled") && $0.trimmingCharacters(in: .whitespaces).hasSuffix("1")
-        }
-    }
-
-    static func grant() -> Bool {
-        let shell = "t=$(mktemp) && echo '\(rule)' > $t && /usr/sbin/visudo -cf $t && "
-            + "/usr/bin/install -m 0440 -o root -g wheel $t \(sudoersFile); rc=$?; rm -f $t; exit $rc"
-        admin(shell)
-        return canDisableSleep()
-    }
-
-    static func revoke() {
-        admin("rm -f \(sudoersFile)")
-    }
-
-    private static func admin(_ shell: String) {
-        var err: NSDictionary?
-        NSAppleScript(source: "do shell script \"\(shell)\" with administrator privileges")?.executeAndReturnError(&err)
     }
 }
 

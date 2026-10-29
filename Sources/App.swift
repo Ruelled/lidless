@@ -24,12 +24,13 @@ enum Main {
 struct LidlessApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @ObservedObject private var s = Session.shared
+    @ObservedObject private var caffeinate = Caffeinate.shared
 
     var body: some Scene {
         MenuBarExtra {
             Panel(s: s)
         } label: {
-            Image(systemName: s.active ? "figure.walk" : (s.caffeinated ? "cup.and.saucer.fill" : "figure.stand"))
+            Image(systemName: s.active ? "figure.walk" : (caffeinate.on ? "cup.and.saucer.fill" : "figure.stand"))
         }
         .menuBarExtraStyle(.window)
     }
@@ -44,7 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         Session.shared.stop("App quit")
-        Session.shared.setCaffeinated(false)
+        Caffeinate.shared.set(false)
         Control.shared.writeState(running: false)
     }
 }

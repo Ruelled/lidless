@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.1 — 2026-10-30
+
+Internal refactor, no change in behavior:
+
+- One file for each part: `Lid.swift` (lid sleep and its watchdog),
+  `Caffeinate.swift` (the switch), `CLI.swift` (the command line) and
+  `Format.swift` (text). `Session.swift` keeps only sessions and guardrails.
+- One saved flag records that Lidless owns `SleepDisabled = 1`. A failed restore
+  is now also retried at the next launch.
+- The command handler has one method for each command.
+- `lidless install` writes the `lidless` wrapper and updates installed skills.
+  `build.sh` calls it, so the wrapper is defined in one place only.
+- The settings tab names are the names for `lidless settings <tab>`.
+- More unit tests (35 checks).
+
 ## 0.3.0 — 2026-10-30
 
 - Several agents can share one session: `start` joins an active session, and

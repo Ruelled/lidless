@@ -1,4 +1,4 @@
-// Saved settings. The panel binds to the same keys with @AppStorage.
+// Saved settings. The panel and the settings window bind to the same keys with @AppStorage.
 
 import Foundation
 
@@ -61,24 +61,4 @@ enum Pref {
             cleanupApps: d.stringArray(forKey: cleanupApps) ?? [],
             reopenApps: d.bool(forKey: reopenApps))
     }
-}
-
-/// caffeinate flags in canonical order. Only d, i, m, s and u; nil if none is valid.
-func normalizedFlags(_ s: String) -> String? {
-    let f = String("dimsu".filter { s.contains($0) })
-    return f.isEmpty || s.contains(where: { !"dimsu".contains($0) }) ? nil : f
-}
-
-func thermalName(_ v: Int) -> String { ["Normal", "Warm", "Hot", "Critical"][max(0, min(3, v))] }
-
-func durationName(_ m: Int) -> String { m < 60 ? "\(m) minutes" : (m == 60 ? "1 hour" : "\(m / 60) hours") }
-
-func clock(_ t: TimeInterval) -> String {
-    let s = max(0, Int(t))
-    return String(format: "%02d:%02d:%02d", s / 3600, s / 60 % 60, s % 60)
-}
-
-func shortDuration(_ t: TimeInterval) -> String {
-    let m = Int(t) / 60
-    return m % 60 == 0 ? "\(m / 60)h" : (m < 60 ? "\(m)m" : "\(m / 60)h\(m % 60)m")
 }

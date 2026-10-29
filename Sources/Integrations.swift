@@ -1,6 +1,26 @@
-// Things outside the app: the update check, the `lidless` command in ~/.local/bin, and agent skills.
+// Things outside the app: open at login, the update check, the `lidless` command in ~/.local/bin,
+// and agent skills.
 
 import AppKit
+import ServiceManagement
+
+// MARK: - Open at login (also cleans up after a crash during a lid session, at the next login)
+
+final class LoginItem: ObservableObject {
+    static let shared = LoginItem()
+    @Published private(set) var enabled = SMAppService.mainApp.status == .enabled
+    @Published private(set) var error: String?
+
+    func set(_ on: Bool) {
+        do {
+            if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+            error = nil
+        } catch {
+            self.error = error.localizedDescription
+        }
+        enabled = SMAppService.mainApp.status == .enabled
+    }
+}
 
 // MARK: - Updates (compare the built commit with the newest commit on GitHub)
 
@@ -39,12 +59,10 @@ final class Updates: ObservableObject {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             DispatchQueue.main.async {
                 self.checking = false
-                let f = DateFormatter()
-                f.timeStyle = .short
                 guard code == 200, sha.count == 40 else { self.status = "Check failed (HTTP \(code))."; return }
                 self.available = sha != self.commit
                 self.status = (self.available ? "A newer version is on GitHub." : "Up to date.")
-                    + " Checked at \(f.string(from: Date()))."
+                    + " Checked at \(shortTime(Date()))."
             }
         }.resume()
     }

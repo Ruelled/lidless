@@ -5,7 +5,7 @@
 set -eu
 cd "$(dirname "$0")"
 command -v swiftc >/dev/null || { echo "swiftc not found. Install the Xcode Command Line Tools: xcode-select --install"; exit 1; }
-version=0.3.0
+version=0.3.1
 commit=$(git rev-parse HEAD 2>/dev/null || echo unknown)
 app=build/Lidless.app
 rm -rf "$app"
@@ -43,20 +43,8 @@ rm -rf ~/Applications/Lidless.app
 cp -R "$app" ~/Applications/
 echo "Installed ~/Applications/Lidless.app"
 
-# The `lidless` command: a wrapper that runs the app binary in command line mode.
-mkdir -p ~/.local/bin
-printf '#!/bin/sh\n# Installed by Lidless. Runs the command line of the Lidless app.\nexec "%s" "$@"\n' \
-  "$HOME/Applications/Lidless.app/Contents/MacOS/Lidless" > ~/.local/bin/lidless
-chmod 755 ~/.local/bin/lidless
-echo "Installed ~/.local/bin/lidless"
-
-# Keep agent skills current, but only where the user installed them.
-for dir in .claude/skills .codex/skills .agents/skills; do
-  if [ -f "$HOME/$dir/lidless/SKILL.md" ]; then
-    cp skill/SKILL.md "$HOME/$dir/lidless/SKILL.md"
-    echo "Updated ~/$dir/lidless/SKILL.md"
-  fi
-done
+# The `lidless` command in ~/.local/bin, and updates of agent skills that the user installed.
+"$HOME/Applications/Lidless.app/Contents/MacOS/Lidless" install
 
 if pgrep -qf "Lidless.app/Contents/MacOS/Lidless$"; then
   echo "Lidless is running the old build. Quit it from its menu and open it again."
