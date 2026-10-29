@@ -30,13 +30,16 @@ session is active, restore normal sleep with `sudo pmset -a disablesleep 0`.
 Build: `./build.sh` (installs) or `./build.sh --no-install` (CI). macOS 13+,
 Xcode Command Line Tools, no Xcode project.
 
-Test after a change to the session code:
+Test after each change:
 
 ```sh
-lidless start --duration 1m --lid --by test   # SleepDisabled must become 1
-kill -9 $(pgrep -f 'Lidless.app/Contents/MacOS/Lidless$')
-pmset -g | grep SleepDisabled                 # must return to 0 within 10 s
+./test.sh                              # unit tests (Tests/main.swift)
+./build.sh && tests/integration.sh     # real sessions, lid mode, crash cleanup
 ```
+
+Add a unit test in `Tests/main.swift` for each new pure function, and an
+integration check in `tests/integration.sh` for each new command. Record each
+change in `CHANGELOG.md`.
 
 Do not use `pmset displaysleepnow` on a desktop setup: it locks the screen and
 can reset USB devices behind a dock.

@@ -2,7 +2,10 @@
 //
 // Lid open:   an IOKit power assertion, the same call that /usr/bin/caffeinate makes.
 // Lid closed: `pmset -a disablesleep 1`, through a sudoers rule for that one command.
-// The Caffeinate switch is separate: it runs `/usr/bin/caffeinate -dimsu` with no limits.
+// The Caffeinate switch is separate: it runs `/usr/bin/caffeinate` with the user's flags and no limits.
+//
+// Several agents can share one session: each one is a holder. `stop --by <name>` removes one holder,
+// and the session ends when no holder is left, or at once when a guardrail trips or the user stops it.
 
 import AppKit
 import IOKit.ps
@@ -14,7 +17,8 @@ final class Session: ObservableObject {
 
     @Published var active = false
     @Published var config: Config?
-    @Published var startedBy = "panel"
+    @Published var holders: [String] = []
+    var startedBy: String { holders.first ?? "panel" }
     @Published var startedAt = Date()
     @Published var endsAt: Date?
     @Published var now = Date()
@@ -36,6 +40,7 @@ final class Session: ObservableObject {
     private var caffeinate: Process?
     private var wakeObserver: NSObjectProtocol?
     private var timer: Timer?
+    private var lastSensorRead = Date.distantPast
 
     init() {
         Pref.register()
@@ -49,6 +54,7 @@ final class Session: ObservableObject {
         readSensors()
         // .common: the guardrail check also runs while a menu or a picker is open.
         let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.tick() }
+        t.tolerance = 0.3   // let macOS group this wake-up with others to save energy
         RunLoop.main.add(t, forMode: .common)
         timer = t
     }
@@ -70,23 +76,22 @@ final class Session: ObservableObject {
         guard !active else { return fail("A session is already active. Stop it first.") }
         error = nil
         changedSleep = false
-        if c.lidClosed {
-            guard lidPermission else { return fail("Lid permission missing. Open Lidless Settings > Lid to grant it.") }
-            // Restore the previous setting at the end: touch SleepDisabled only if it was off.
-            if !Lid.sleepDisabled() {
-                guard Lid.setDisableSleep(true) else { return fail("Could not run pmset -a disablesleep 1.") }
-                changedSleep = true
-                UserDefaults.standard.set(true, forKey: Lid.flag)
-                startWatchdog()
-            }
+        // A session that a guardrail would stop at once only confuses. Say why instead.
+        readSensors()
+        if let floor = c.batteryFloor, !onAC, let b = battery, b <= floor {
+            return fail("The battery is at \(b)%, at or below the limit of \(floor)%. Connect power or lower the limit.")
         }
+        if let limit = c.thermalLimit, thermal >= limit {
+            return fail("The Mac is already \(thermalName(thermal)), at or above the heat limit. Let it cool down first.")
+        }
+        if c.lidClosed, let e = enableLidMode() { return fail(e) }
         assertions = [Self.hold(kIOPMAssertionTypePreventUserIdleSystemSleep)]
             + (c.keepDisplay ? [Self.hold(kIOPMAssertionTypePreventUserIdleDisplaySleep)] : [])
         // A menu bar app with no visible window can get App Nap, which slows the guardrail timer.
         activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleSystemSleepDisabled],
                                                          reason: "Lidless guardrails")
         config = c
-        startedBy = source
+        holders = [source]
         startedAt = Date()
         endsAt = c.endsAfter.map { Date().addingTimeInterval($0) }
         active = true
@@ -112,6 +117,53 @@ final class Session: ObservableObject {
         return nil
     }
 
+    /// Adds a holder to the active session. The end time can move later (at most 24 hours from now),
+    /// and lid mode can turn on. The battery and heat limits stay as they are.
+    func join(_ c: Config, by source: String) -> String? {
+        guard active, var cur = config else { return start(c, by: source) }
+        error = nil
+        if c.lidClosed && !cur.lidClosed {
+            if let e = enableLidMode() { return fail(e) }
+            cur.lidClosed = true
+        }
+        if let end = endsAt, let add = c.endsAfter, Date().addingTimeInterval(add) > end {
+            endsAt = Date().addingTimeInterval(add)
+        }
+        config = cur
+        if !holders.contains(source) { holders.append(source) }
+        Log.write("\(source) joined the session. Holders: \(holders.joined(separator: ", "))")
+        Control.shared.writeState()
+        return nil
+    }
+
+    /// Removes one holder. The session ends when no holder is left.
+    func release(_ source: String) -> (ok: Bool, message: String) {
+        guard active else { return (true, "No session was active.") }
+        guard let i = holders.firstIndex(of: source) else {
+            return (false, "\(source) does not hold the session. Holders: \(holders.joined(separator: ", ")).")
+        }
+        holders.remove(at: i)
+        if holders.isEmpty {
+            stop("Stopped by \(source)")
+            return (true, "Session stopped.")
+        }
+        Log.write("\(source) left the session. Holders: \(holders.joined(separator: ", "))")
+        Control.shared.writeState()
+        return (true, "\(source) left the session. It continues for \(holders.joined(separator: ", ")).")
+    }
+
+    /// Sets SleepDisabled = 1 if it is not set yet. At the end only that change is undone,
+    /// so a value of 1 that the user set before stays.
+    private func enableLidMode() -> String? {
+        guard lidPermission else { return "Lid permission missing. Open Lidless Settings > Lid to grant it." }
+        if Lid.sleepDisabled() { return nil }
+        guard Lid.setDisableSleep(true) else { return "Could not run pmset -a disablesleep 1." }
+        changedSleep = true
+        UserDefaults.standard.set(true, forKey: Lid.flag)
+        startWatchdog()
+        return nil
+    }
+
     /// Ends the session and undoes everything that start did. Returns false if none was active.
     @discardableResult
     func stop(_ reason: String) -> Bool {
@@ -121,8 +173,14 @@ final class Session: ObservableObject {
         if let a = activity { ProcessInfo.processInfo.endActivity(a) }
         activity = nil
         if changedSleep {
-            Lid.setDisableSleep(false)
-            UserDefaults.standard.set(false, forKey: Lid.flag)
+            if Lid.setDisableSleep(false) {
+                UserDefaults.standard.set(false, forKey: Lid.flag)
+            } else {
+                // Keep the flag: the next launch tries again.
+                error = "Could not restore lid sleep. Run `sudo pmset -a disablesleep 0` in Terminal."
+                Log.write("Could not restore lid sleep")
+                Notifier.post("Lidless could not restore sleep", "Run: sudo pmset -a disablesleep 0")
+            }
             changedSleep = false
         }
         watchdog?.terminate()
@@ -133,6 +191,7 @@ final class Session: ObservableObject {
         savedBrightness = nil
         AppCleanup.reopen(appsToReopen)
         appsToReopen = []
+        holders = []
         active = false
         let f = DateFormatter()
         f.timeStyle = .short
@@ -152,8 +211,11 @@ final class Session: ObservableObject {
 
     private func tick() {
         now = Date()
-        readSensors()
-        if Control.shared.stale { Control.shared.writeState() }
+        // Read the sensors every second only when someone looks or a session runs.
+        if active || MenuPanel.window?.isVisible == true || now.timeIntervalSince(lastSensorRead) >= 30 {
+            readSensors()
+        }
+        if Control.shared.isStale(busy: active || caffeinated) { Control.shared.writeState() }
         guard active, let c = config else { return }
         if let end = endsAt, now >= end { stop("Time limit reached") }
         else if let floor = c.batteryFloor, !onAC, let b = battery, b <= floor { stop("Battery at \(b)%") }
@@ -161,6 +223,7 @@ final class Session: ObservableObject {
     }
 
     private func readSensors() {
+        lastSensorRead = Date()
         thermal = ProcessInfo.processInfo.thermalState.rawValue
         guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
               let list = IOPSCopyPowerSourcesList(info)?.takeRetainedValue() as? [CFTypeRef] else { return }
@@ -247,6 +310,8 @@ final class Session: ObservableObject {
     }
 
     func revokePermission() {
+        // Without the rule, the end of a lid session could not restore sleep. End it first.
+        if active && changedSleep { stop("Lid permission removed") }
         Lid.revoke()
         lidPermission = Lid.canDisableSleep()
         Log.write("Lid permission removed")

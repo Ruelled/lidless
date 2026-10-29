@@ -66,7 +66,14 @@ lidless settings [general|safety|caffeinate|lid|cleanup|agents]
 ```
 
 Options that you leave out come from the saved panel settings. `start` opens
-Lidless if it is not running. Exit codes: 0 success, 1 failure, 2 usage error.
+Lidless if it is not running. Durations are at most 24 hours. Exit codes: 0
+success, 1 failure, 2 usage error.
+
+**Several agents.** When a session is active, `start` joins it: each `--by`
+name becomes a holder, and the end time moves later if needed. `stop --by
+<name>` removes one holder, and the session ends when no holder is left.
+`stop` without `--by` ends it for everyone. App Cleanup never quits the app
+that sent the command, for example the agent's terminal.
 
 The command and the app talk through a distributed notification (local
 processes only) and the state file
@@ -115,10 +122,21 @@ temperature limit uses the macOS thermal state, and the Mac usually slows
 itself down before it reports "Hot", so do not rely on that limit alone. Use
 this software at your own risk; see the [license](LICENSE).
 
+## Testing
+
+```sh
+./test.sh               # unit tests; change nothing on the Mac (also run in CI)
+./build.sh && tests/integration.sh   # real sessions against the installed app
+```
+
+The integration tests refuse to run while a session or caffeinate is active.
+With the lid permission, they also crash the app on purpose and check that
+`SleepDisabled` returns to `0`.
+
 ## For agents
 
 See [AGENTS.md](AGENTS.md) for build commands and shell checks of the state.
 
 ## License
 
-MIT
+MIT. See also [CHANGELOG.md](CHANGELOG.md) and [SECURITY.md](SECURITY.md).

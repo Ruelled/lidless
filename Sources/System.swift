@@ -195,13 +195,19 @@ enum Log {
     static let url = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Logs/Lidless/lidless.log")
 
+    private static let stamp: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.timeZone = .current   // local time, so the log matches the clock on the wall
+        return f
+    }()
+
     static func write(_ message: String) {
         let fm = FileManager.default
         try? fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         if let size = (try? fm.attributesOfItem(atPath: url.path))?[.size] as? Int, size > 1_000_000 {
             try? fm.removeItem(at: url)
         }
-        let line = Data("\(ISO8601DateFormatter().string(from: Date())) \(message)\n".utf8)
+        let line = Data("\(stamp.string(from: Date())) \(message)\n".utf8)
         if let h = try? FileHandle(forWritingTo: url) {
             h.seekToEndOfFile()
             h.write(line)

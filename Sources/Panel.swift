@@ -80,8 +80,10 @@ struct Panel: View {
             Button { SettingsWindow.show() } label: {
                 Image(systemName: updates.available ? "gearshape.arrow.triangle.2.circlepath" : "gearshape")
             }
+            .accessibilityLabel(updates.available ? "Settings, update available" : "Settings")
             .buttonStyle(.borderless).help(updates.available ? "Settings (update available)" : "Settings")
             Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }
+                .accessibilityLabel("Quit Lidless")
                 .buttonStyle(.borderless).help("Quit (ends the session)")
         }
     }
@@ -111,6 +113,7 @@ struct Panel: View {
                     HStack(spacing: 4) {
                         Text("Temperature")
                         Button { SettingsWindow.show(.safety) } label: { Image(systemName: "info.circle") }
+                            .accessibilityLabel("What the heat levels mean")
                             .buttonStyle(.borderless).help("What the heat levels mean")
                     }
                     Toggle("Stop at", isOn: $useThermal)
@@ -203,10 +206,10 @@ struct Panel: View {
                             .foregroundStyle(.secondary).lineLimit(1)
                     }
                 }
-                if s.startedBy != "panel" {
+                if s.holders != ["panel"] {
                     GridRow {
-                        Text("Started by").foregroundStyle(.secondary)
-                        Text(s.startedBy)
+                        Text(s.holders.count > 1 ? "Held by" : "Started by").foregroundStyle(.secondary)
+                        Text(s.holders.joined(separator: ", ")).lineLimit(1)
                         Text("")
                     }
                 }

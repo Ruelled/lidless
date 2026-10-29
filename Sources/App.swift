@@ -11,6 +11,12 @@ enum Main {
         if let first = args.first, CLI.commands.contains(first) {
             exit(CLI.run(args))
         }
+        // One copy only: a second copy would add a second icon and fight over the state file.
+        let me = ProcessInfo.processInfo.processIdentifier
+        if let id = Bundle.main.bundleIdentifier,
+           NSRunningApplication.runningApplications(withBundleIdentifier: id).contains(where: { $0.processIdentifier != me && $0.activationPolicy != .prohibited }) {
+            exit(0)
+        }
         LidlessApp.main()
     }
 }

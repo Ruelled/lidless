@@ -17,14 +17,16 @@ Always give all three limits:
 lidless start --duration 2h --battery-floor 20 --thermal-stop hot --by <your agent name>
 ```
 
+Always pass `--by` with a short name for yourself, for example `codex` or `claude`.
+
 - Add `--lid` only if the user says that they will close the lid. It needs the lid
   permission. If it is missing, the command fails and tells you so. Then tell the user
   to open Lidless Settings > Lid.
 - Durations: `30m`, `2h`, `1h30m`. Thermal stops: `warm`, `hot`, `critical`.
 - The user's heat limit is a ceiling. A weaker `--thermal-stop` (or `none`) is
   ignored, and the reply says so. Do not try to work around it.
-- If a session is already active, `start` fails. Run `lidless status` and do not stop
-  a session that the user or another agent started.
+- If a session is already active, `start` joins it: you become one of its holders,
+  and its end time moves later if you need more time. Its battery and heat limits stay.
 
 ## Check
 
@@ -35,11 +37,14 @@ lidless status --json   # active, startedBy, endsAt, battery, thermal, lidClosed
 
 ## Stop
 
-When your task is done, stop the session that you started:
+When your task is done, leave the session:
 
 ```sh
-lidless stop
+lidless stop --by <your agent name>
 ```
+
+The session ends when its last holder leaves. Do not run `lidless stop` without
+`--by`: that stops the session for the user and every other agent.
 
 ## Rules
 

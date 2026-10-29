@@ -24,6 +24,7 @@ struct LidlessState: Codable {
     var pid: Int32
     var active: Bool
     var startedBy: String?
+    var holders: [String]?
     var startedAt: Date?
     var endsAt: Date?
     var batteryFloor: Int?
@@ -59,7 +60,8 @@ final class Control {
     private var lastWrite = Date.distantPast
     private var lastReply: Reply?
 
-    var stale: Bool { Date().timeIntervalSince(lastWrite) > 30 }
+    /// The state file carries the battery and heat level for `lidless status`. Refresh it more often when busy.
+    func isStale(busy: Bool) -> Bool { Date().timeIntervalSince(lastWrite) > (busy ? 30 : 120) }
 
     func listen() {
         DistributedNotificationCenter.default().addObserver(forName: commandNotification, object: nil, queue: .main) {
@@ -87,15 +89,37 @@ final class Control {
                 }
             }
             if let v = info["lid"] as? Bool { c.lidClosed = v }
-            if let e = s.start(c, by: info["by"] as? String ?? "cli") {
+            // Do not let App Cleanup quit the app that sent the command (the agent's terminal or editor).
+            if let protect = info["protect"] as? [String] {
+                let before = c.cleanupApps.count
+                c.cleanupApps.removeAll { protect.contains($0) }
+                if c.cleanupApps.count < before { note += " App Cleanup kept the app that sent this command open." }
+            }
+            let by = info["by"] as? String ?? "cli"
+            if s.active {
+                if let e = s.join(c, by: by) {
+                    reply.ok = false
+                    reply.message = e
+                } else {
+                    let f = DateFormatter()
+                    f.timeStyle = .short
+                    reply.message = "Joined the active session. Holders: \(s.holders.joined(separator: ", "))."
+                        + (s.endsAt.map { " It ends at \(f.string(from: $0))." } ?? "") + note
+                }
+            } else if let e = s.start(c, by: by) {
                 reply.ok = false
                 reply.message = e
             } else {
                 reply.message = "Session started: \(s.summary)." + note
             }
         case "stop":
-            reply.message = s.stop(info["reason"] as? String ?? "Stopped from the command line")
-                ? "Session stopped." : "No session was active."
+            if let by = info["by"] as? String {
+                let r = s.release(by)
+                reply.ok = r.ok
+                reply.message = r.message
+            } else {
+                reply.message = s.stop("Stopped from the command line") ? "Session stopped." : "No session was active."
+            }
         case "caffeinate":
             let on = info["on"] as? Bool ?? false
             var args: [String]?
@@ -128,7 +152,7 @@ final class Control {
         let c = s.active ? s.config : nil
         let state = LidlessState(
             running: running, pid: ProcessInfo.processInfo.processIdentifier, active: s.active,
-            startedBy: c == nil ? nil : s.startedBy, startedAt: c == nil ? nil : s.startedAt, endsAt: s.endsAt.flatMap { c == nil ? nil : $0 },
+            startedBy: c == nil ? nil : s.startedBy, holders: c == nil ? nil : s.holders, startedAt: c == nil ? nil : s.startedAt, endsAt: s.endsAt.flatMap { c == nil ? nil : $0 },
             batteryFloor: c?.batteryFloor, thermalStop: c?.thermalLimit.map { thermalName($0).lowercased() },
             lidClosed: c?.lidClosed ?? false, caffeinated: s.caffeinated, battery: s.battery, onAC: s.onAC,
             thermal: thermalName(s.thermal).lowercased(), lidPermission: s.lidPermission,
@@ -148,13 +172,14 @@ enum CLI {
     Usage: lidless <command> [options]
 
     Commands:
-      start [options]        Start a session with guardrails.
+      start [options]        Start a session with guardrails, or join the active one.
         --duration <t>         30m, 2h, 1h30m, or none. Default: the saved panel setting.
         --battery-floor <n>    Stop below n percent on battery (5-95), or none.
         --thermal-stop <s>     warm, hot, critical, or none.
         --lid / --no-lid       Allow the lid to close (needs the lid permission).
-        --by <name>            Who started it, for example codex or claude.
-      stop                   Stop the session.
+        --by <name>            Who holds it, for example codex or claude.
+      stop [--by <name>]     With --by: leave the session; it ends when no holder is left.
+                             Without --by: stop the session for everyone.
       status                 Show the state. Add --json for machine output.
       caffeinate on|off      Switch caffeinate on or off. No battery or heat limits.
         --flags <letters>      For this run only: any of d i m s u. Default: Settings > Caffeinate.
@@ -173,9 +198,12 @@ enum CLI {
         case "start":
             guard var info = parseStart(rest) else { return 2 }
             info["cmd"] = "start"
+            info["protect"] = callerApps()
             return send(info, json: json)
         case "stop":
-            return send(["cmd": "stop"], json: json)
+            if rest.isEmpty { return send(["cmd": "stop"], json: json) }
+            guard rest.count == 2, rest[0] == "--by" else { return usageError("stop takes only --by <name>") }
+            return send(["cmd": "stop", "by": String(rest[1].lowercased().prefix(40))], json: json)
         case "caffeinate":
             guard let v = rest.first, v == "on" || v == "off" else { return usageError("caffeinate needs on or off") }
             var info: [String: Any] = ["cmd": "caffeinate", "on": v == "on"]
@@ -193,7 +221,7 @@ enum CLI {
                     }
                     info["flags"] = f
                 case "--for":
-                    guard let secs = parseDuration(val) else { return usageError("bad --for") }
+                    guard let secs = parseDuration(val) else { return usageError("bad --for (at most 24h)") }
                     info["seconds"] = secs
                 default:
                     return usageError("unknown option \(opt)")
@@ -221,7 +249,7 @@ enum CLI {
         while i < a.count {
             switch a[i] {
             case "--duration":
-                guard let v = value(), let secs = parseDuration(v) else { usageError("bad --duration"); return nil }
+                guard let v = value(), let secs = parseDuration(v) else { usageError("bad --duration (at most 24h)"); return nil }
                 info["duration"] = secs
             case "--battery-floor":
                 guard let v = value() else { usageError("bad --battery-floor"); return nil }
@@ -246,10 +274,12 @@ enum CLI {
         return info
     }
 
-    /// "30m", "2h", "1h30m", "45s", "90" (minutes), "none"/"0" → seconds (0 = no limit).
+    static let maxDuration = 24 * 3600
+
+    /// "30m", "2h", "1h30m", "45s", "90" (minutes), "none"/"0" → seconds (0 = no limit). At most 24 hours.
     static func parseDuration(_ s: String) -> Int? {
         if s == "none" || s == "0" { return 0 }
-        if let m = Int(s) { return m > 0 ? m * 60 : nil }
+        if let m = Int(s) { return m > 0 && m * 60 <= maxDuration ? m * 60 : nil }
         var total = 0, num = ""
         for ch in s {
             if ch.isNumber { num.append(ch); continue }
@@ -257,7 +287,20 @@ enum CLI {
             total += n * unit
             num = ""
         }
-        return num.isEmpty && total > 0 ? total : nil
+        return num.isEmpty && total > 0 && total <= maxDuration ? total : nil
+    }
+
+    /// Bundle identifiers of the apps above this process, for example Terminal or the editor of an agent.
+    static func callerApps() -> [String] {
+        var ids: [String] = []
+        var pid = getppid()
+        for _ in 0..<32 where pid > 1 {
+            if let id = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier { ids.append(id) }
+            var info = proc_bsdinfo()
+            guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, Int32(MemoryLayout<proc_bsdinfo>.size)) > 0 else { break }
+            pid = pid_t(info.pbi_ppid)
+        }
+        return ids
     }
 
     @discardableResult
@@ -271,7 +314,13 @@ enum CLI {
         return 1
     }
 
-    private static func alive(_ pid: Int32) -> Bool { pid > 0 && kill(pid, 0) == 0 }
+    /// True if the process exists and is Lidless. After a crash, macOS can give the old pid to another process.
+    private static func alive(_ pid: Int32) -> Bool {
+        guard pid > 0, kill(pid, 0) == 0 else { return false }
+        var path = [CChar](repeating: 0, count: 4096)
+        guard proc_pidpath(pid, &path, UInt32(path.count)) > 0 else { return true }
+        return String(cString: path).hasSuffix("/Contents/MacOS/Lidless")
+    }
 
     private static func liveState() -> LidlessState? {
         guard let s = LidlessState.read(), s.running, alive(s.pid) else { return nil }
