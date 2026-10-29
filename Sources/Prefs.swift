@@ -31,6 +31,8 @@ enum Pref {
     static let reopenApps = "reopenApps"
     static let notifications = "notifications"
     static let autoUpdate = "autoUpdateCheck"
+    static let caffeinateFlags = "caffeinateFlags"
+    static let caffeinateMinutes = "caffeinateMinutes"
 
     static let durations = [30, 60, 120, 240, 480]
     static let floors = [10, 15, 20, 25, 30, 40, 50]
@@ -40,6 +42,7 @@ enum Pref {
             useDuration: true, minutes: 120, useBattery: true, floor: 20, useThermal: true, thermalLimit: 2,
             allowLid: false, keepDisplay: false, sleepDisplay: false, stopOnWake: false, minBrightness: false,
             cleanupApps: [String](), reopenApps: true, notifications: true, autoUpdate: true,
+            caffeinateFlags: "dimsu", caffeinateMinutes: 0,
         ])
     }
 
@@ -58,6 +61,12 @@ enum Pref {
             cleanupApps: d.stringArray(forKey: cleanupApps) ?? [],
             reopenApps: d.bool(forKey: reopenApps))
     }
+}
+
+/// caffeinate flags in canonical order. Only d, i, m, s and u; nil if none is valid.
+func normalizedFlags(_ s: String) -> String? {
+    let f = String("dimsu".filter { s.contains($0) })
+    return f.isEmpty || s.contains(where: { !"dimsu".contains($0) }) ? nil : f
 }
 
 func thermalName(_ v: Int) -> String { ["Normal", "Warm", "Hot", "Critical"][max(0, min(3, v))] }

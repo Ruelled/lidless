@@ -194,27 +194,47 @@ final class Session: ObservableObject {
     // MARK: Caffeinate switch: the real `caffeinate -dimsu`, no limits.
     // `-w` ends caffeinate when Lidless exits, also after a crash.
 
-    func setCaffeinated(_ on: Bool) {
-        guard on != caffeinated || (on && caffeinate == nil) else { return }
+    @Published var caffeinateArgs: [String] = []
+
+    /// The saved choice from Settings > Caffeinate, for example ["-dimsu"] or ["-di", "-t", "7200"].
+    static func savedCaffeinateArgs() -> [String] {
+        let d = UserDefaults.standard
+        let flags = normalizedFlags(d.string(forKey: Pref.caffeinateFlags) ?? "") ?? "dimsu"
+        let minutes = d.integer(forKey: Pref.caffeinateMinutes)
+        return ["-\(flags)"] + (minutes > 0 ? ["-t", String(minutes * 60)] : [])
+    }
+
+    /// Switches caffeinate on or off. `args` overrides the saved flags for this run only.
+    func setCaffeinated(_ on: Bool, args: [String]? = nil) {
+        guard on != caffeinated || on else { return }
         caffeinate?.terminate()
         caffeinate = nil
         if on {
+            let a = args ?? Self.savedCaffeinateArgs()
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/usr/bin/caffeinate")
-            p.arguments = ["-dimsu", "-w", String(ProcessInfo.processInfo.processIdentifier)]
+            p.arguments = a + ["-w", String(ProcessInfo.processInfo.processIdentifier)]
             p.terminationHandler = { [weak self] proc in
                 DispatchQueue.main.async {
+                    // Only a run that ends by itself (its -t time limit) gets here with caffeinate === proc.
                     guard let self, self.caffeinate === proc else { return }
                     self.caffeinate = nil
                     self.caffeinated = false
+                    Log.write("Caffeinate ended: time limit reached")
+                    Notifier.post("Caffeinate ended", "Its time limit was reached.")
                     Control.shared.writeState()
                 }
             }
-            do { try p.run(); caffeinate = p } catch { self.error = "caffeinate: \(error.localizedDescription)" }
+            do { try p.run(); caffeinate = p; caffeinateArgs = a } catch { self.error = "caffeinate: \(error.localizedDescription)" }
         }
         caffeinated = caffeinate != nil
-        Log.write("Caffeinate \(caffeinated ? "on" : "off")")
+        Log.write(caffeinated ? "Caffeinate on: caffeinate \(caffeinateArgs.joined(separator: " "))" : "Caffeinate off")
         Control.shared.writeState()
+    }
+
+    /// Applies a changed choice in Settings to a running caffeinate.
+    func restartCaffeinateIfOn() {
+        if caffeinated { setCaffeinated(true) }
     }
 
     // MARK: Settings actions

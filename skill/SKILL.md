@@ -45,8 +45,8 @@ lidless stop
 
 - Do not start a session without limits.
 - Do not run `sudo pmset` yourself. Lidless restores sleep when the session ends.
-- `lidless caffeinate on|off` runs `caffeinate -dimsu` with no limits. Use it only
-  when the user asks for it.
+- `lidless caffeinate on|off` runs `caffeinate` with the user's flags and no
+  battery or heat limits. Use it only when the user asks for it.
 - Exit codes: 0 success, 1 failure (the message says why), 2 usage error.
 - If `lidless` is not found, try `~/.local/bin/lidless`. Otherwise tell the user to
   install Lidless from https://github.com/Ruelled/lidless.

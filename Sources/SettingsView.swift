@@ -3,7 +3,7 @@
 import SwiftUI
 import AppKit
 
-enum SettingsTab: Hashable { case general, safety, lid, cleanup, agents }
+enum SettingsTab: Hashable { case general, safety, caffeinate, lid, cleanup, agents }
 
 final class SettingsRouter: ObservableObject {
     static let shared = SettingsRouter()
@@ -14,6 +14,7 @@ enum SettingsWindow {
     private static var window: NSWindow?
 
     static func show(_ tab: SettingsTab = .general) {
+        MenuPanel.close()
         SettingsRouter.shared.tab = tab
         if window == nil {
             let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView()))
@@ -25,6 +26,7 @@ enum SettingsWindow {
         }
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
+        window?.orderFrontRegardless()
     }
 }
 
@@ -35,6 +37,7 @@ struct SettingsView: View {
         TabView(selection: $router.tab) {
             GeneralTab().tabItem { Label("General", systemImage: "gearshape") }.tag(SettingsTab.general)
             SafetyTab().tabItem { Label("Safety", systemImage: "thermometer.medium") }.tag(SettingsTab.safety)
+            CaffeinateTab().tabItem { Label("Caffeinate", systemImage: "cup.and.saucer") }.tag(SettingsTab.caffeinate)
             LidTab().tabItem { Label("Lid", systemImage: "laptopcomputer") }.tag(SettingsTab.lid)
             CleanupTab().tabItem { Label("App Cleanup", systemImage: "xmark.app") }.tag(SettingsTab.cleanup)
             AgentsTab().tabItem { Label("Agents", systemImage: "terminal") }.tag(SettingsTab.agents)
@@ -172,6 +175,75 @@ private struct SafetyTab: View {
             Text("A session will then continue while the Mac is hot, for example in a closed bag. "
                  + "Only the time and battery limits will stop it.")
         }
+    }
+}
+
+// MARK: - Caffeinate (which flags the switch passes to /usr/bin/caffeinate)
+
+private struct CaffeinateTab: View {
+    @ObservedObject private var s = Session.shared
+    @AppStorage(Pref.caffeinateFlags) private var flags = "dimsu"
+    @AppStorage(Pref.caffeinateMinutes) private var minutes = 0
+
+    private static let options: [(letter: Character, name: String, meaning: String)] = [
+        ("d", "Display", "Keep the display on."),
+        ("i", "Idle sleep", "Stop the Mac from sleeping when nobody uses it. The caffeinate default."),
+        ("m", "Disk sleep", "Keep the disks spinning. Almost no effect on an SSD."),
+        ("s", "System sleep", "Stop all system sleep on mains power, also with the lid closed. No effect on battery."),
+        ("u", "User active", "Tell macOS that a user is present, which wakes the display. "
+                             + "Without a time limit, macOS drops this after 5 seconds."),
+    ]
+    private static let presets = [("dimsu", "Everything"), ("dims", "No wake"), ("di", "Display and idle"), ("i", "Idle only")]
+
+    private var command: String {
+        "caffeinate " + Session.savedCaffeinateArgs().joined(separator: " ") + " -w <Lidless pid>"
+    }
+
+    private func binding(_ letter: Character) -> Binding<Bool> {
+        Binding(get: { flags.contains(letter) }, set: { on in
+            let next = on ? flags + String(letter) : flags.replacingOccurrences(of: String(letter), with: "")
+            if let f = normalizedFlags(next) { flags = f; s.restartCaffeinateIfOn() }
+        })
+    }
+
+    var body: some View {
+        Form {
+            Section("What the Caffeinate switch runs") {
+                ForEach(Self.options, id: \.letter) { o in
+                    Toggle(isOn: binding(o.letter)) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("-\(String(o.letter))  \(o.name)").font(.body.monospaced())
+                            Text(o.meaning).font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .disabled(flags == String(o.letter))   // keep at least one flag
+                }
+                HStack {
+                    Text("Presets").foregroundStyle(.secondary)
+                    ForEach(Self.presets, id: \.0) { p in
+                        Button("\(p.1) (-\(p.0))") { flags = p.0; s.restartCaffeinateIfOn() }
+                            .controlSize(.small)
+                    }
+                }
+            }
+            Section("Time limit") {
+                Picker("Switch off after", selection: $minutes) {
+                    Text("Never").tag(0)
+                    ForEach(Pref.durations, id: \.self) { Text(durationName($0)).tag($0) }
+                }
+                .onChange(of: minutes) { _ in s.restartCaffeinateIfOn() }
+            }
+            Section("Command") {
+                Text(command).font(.system(.callout, design: .monospaced)).textSelection(.enabled)
+                Text("`-w` ends caffeinate when Lidless quits or crashes. "
+                     + (s.caffeinated ? "Caffeinate is on: changes apply at once." : "Caffeinate is off."))
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("The switch has no battery or heat limits. For a Mac in a bag, use a session.")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 

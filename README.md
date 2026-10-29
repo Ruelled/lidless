@@ -9,9 +9,11 @@ laptop is in your bag. It is a free, open-source take on the idea behind
 
 ## Features
 
-- **Caffeinate switch**: runs `/usr/bin/caffeinate -dimsu` until you switch it
-  off or quit Lidless. On mains power, `-s` also keeps the Mac awake with the
-  lid closed. On battery, use a session with lid-closed mode.
+- **Caffeinate switch**: runs `/usr/bin/caffeinate` until you switch it off or
+  quit Lidless. Choose the flags (`-d -i -m -s -u`, default `-dimsu`) and an
+  optional time limit in Settings > Caffeinate. On mains power, `-s` also keeps
+  the Mac awake with the lid closed. On battery, use a session with lid-closed
+  mode.
 - **Sessions with guardrails**: stop after a time, below a battery percentage
   (on battery only), or at a thermal state (Warm, Hot, Critical).
 - **Lid closed**: optional. Uses `pmset -a disablesleep 1` and restores the
@@ -58,7 +60,9 @@ stricter, not weaker.
 lidless start --duration 2h --battery-floor 20 --thermal-stop hot [--lid] [--by codex]
 lidless status            # add --json for machine output
 lidless stop
-lidless caffeinate on|off
+lidless caffeinate on [--flags di] [--for 2h]   # flags and time for this run only
+lidless caffeinate off
+lidless settings [general|safety|caffeinate|lid|cleanup|agents]
 ```
 
 Options that you leave out come from the saved panel settings. `start` opens

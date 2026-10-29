@@ -3,6 +3,43 @@
 import SwiftUI
 import AppKit
 
+/// Finds the NSWindow that hosts a SwiftUI view.
+struct WindowReader: NSViewRepresentable {
+    let found: (NSWindow?) -> Void
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView()
+        DispatchQueue.main.async { found(v.window) }
+        return v
+    }
+    func updateNSView(_ v: NSView, context: Context) { DispatchQueue.main.async { found(v.window) } }
+}
+
+/// The panel floats above normal windows, so close it before another window of this app opens.
+enum MenuPanel {
+    static weak var window: NSWindow?
+
+    static func close() {
+        guard let w = window, w.isVisible else { return }
+        // Click our own menu bar icon, so that SwiftUI closes the panel and keeps its open/closed state right.
+        statusButton()?.performClick(nil)
+        if w.isVisible { w.orderOut(nil) }
+    }
+
+    private static func statusButton() -> NSButton? {
+        for win in NSApp.windows where win.className.contains("StatusBarWindow") {
+            if let b = firstButton(in: win.contentView) { return b }
+        }
+        return nil
+    }
+
+    private static func firstButton(in view: NSView?) -> NSButton? {
+        guard let view else { return nil }
+        if let b = view as? NSButton { return b }
+        for sub in view.subviews { if let b = firstButton(in: sub) { return b } }
+        return nil
+    }
+}
+
 struct Panel: View {
     @ObservedObject var s: Session
     @ObservedObject private var cleanup = CleanupList.shared
@@ -28,6 +65,7 @@ struct Panel: View {
         }
         .padding(16)
         .frame(width: 400)
+        .background(WindowReader { MenuPanel.window = $0 })
     }
 
     private var header: some View {
@@ -37,7 +75,8 @@ struct Panel: View {
             Spacer()
             Toggle("Caffeinate", isOn: Binding(get: { s.caffeinated }, set: { s.setCaffeinated($0) }))
                 .toggleStyle(.switch).controlSize(.small)
-                .help("Runs caffeinate -dimsu until you switch it off.")
+                .help("Runs caffeinate \(Session.savedCaffeinateArgs().joined(separator: " ")). "
+                      + "Change it in Settings > Caffeinate.")
             Button { SettingsWindow.show() } label: {
                 Image(systemName: updates.available ? "gearshape.arrow.triangle.2.circlepath" : "gearshape")
             }

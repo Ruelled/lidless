@@ -98,9 +98,22 @@ final class Control {
                 ? "Session stopped." : "No session was active."
         case "caffeinate":
             let on = info["on"] as? Bool ?? false
-            s.setCaffeinated(on)
+            var args: [String]?
+            if on, info["flags"] != nil || info["seconds"] != nil {
+                let saved = Session.savedCaffeinateArgs()
+                let flags = (info["flags"] as? String).map { "-" + $0 } ?? saved[0]
+                let secs = info["seconds"] as? Int
+                args = [flags] + (secs.map { $0 > 0 ? ["-t", String($0)] : [] } ?? Array(saved.dropFirst()))
+            }
+            s.setCaffeinated(on, args: args)
             reply.ok = s.caffeinated == on
-            reply.message = s.caffeinated ? "Caffeinate on (caffeinate -dimsu)." : "Caffeinate off."
+            reply.message = s.caffeinated ? "Caffeinate on (caffeinate \(s.caffeinateArgs.joined(separator: " ")))." : "Caffeinate off."
+        case "settings":
+            let tabs: [String: SettingsTab] = ["general": .general, "safety": .safety, "caffeinate": .caffeinate,
+                                               "lid": .lid, "cleanup": .cleanup, "agents": .agents]
+            let name = info["tab"] as? String ?? "general"
+            if let tab = tabs[name] { SettingsWindow.show(tab); reply.message = "Settings opened." }
+            else { reply.ok = false; reply.message = "Unknown tab \(name). Tabs: \(tabs.keys.sorted().joined(separator: ", "))." }
         default:
             reply.ok = false
             reply.message = "Unknown command: \(cmd)"
@@ -128,7 +141,7 @@ final class Control {
 // MARK: - Command line
 
 enum CLI {
-    static let commands: Set<String> = ["start", "stop", "status", "caffeinate", "version", "help", "--help", "-h", "--version"]
+    static let commands: Set<String> = ["start", "stop", "status", "caffeinate", "settings", "version", "help", "--help", "-h", "--version"]
 
     static let usage = """
     Usage: lidless <command> [options]
@@ -142,7 +155,10 @@ enum CLI {
         --by <name>            Who started it, for example codex or claude.
       stop                   Stop the session.
       status                 Show the state. Add --json for machine output.
-      caffeinate on|off      Switch caffeinate -dimsu on or off (no limits).
+      caffeinate on|off      Switch caffeinate on or off. No battery or heat limits.
+        --flags <letters>      For this run only: any of d i m s u. Default: Settings > Caffeinate.
+        --for <t>              For this run only: stop after t (30m, 2h), or none.
+      settings [tab]         Open Settings: general, safety, caffeinate, lid, cleanup, agents.
       version                Show the version.
 
     Add --json to any command to print the full state as JSON.
@@ -161,7 +177,30 @@ enum CLI {
             return send(["cmd": "stop"], json: json)
         case "caffeinate":
             guard let v = rest.first, v == "on" || v == "off" else { return usageError("caffeinate needs on or off") }
-            return send(["cmd": "caffeinate", "on": v == "on"], json: json)
+            var info: [String: Any] = ["cmd": "caffeinate", "on": v == "on"]
+            var i = 1
+            while i < rest.count {
+                let opt = rest[i]
+                i += 1
+                guard i < rest.count else { return usageError("\(opt) needs a value") }
+                let val = rest[i].lowercased()
+                i += 1
+                switch opt {
+                case "--flags":
+                    guard let f = normalizedFlags(val.trimmingCharacters(in: CharacterSet(charactersIn: "-"))) else {
+                        return usageError("--flags takes letters from dimsu, for example dimsu or di")
+                    }
+                    info["flags"] = f
+                case "--for":
+                    guard let secs = parseDuration(val) else { return usageError("bad --for") }
+                    info["seconds"] = secs
+                default:
+                    return usageError("unknown option \(opt)")
+                }
+            }
+            return send(info, json: json)
+        case "settings":
+            return send(["cmd": "settings", "tab": rest.first ?? "general"], json: json)
         case "status":
             return status(json: json)
         case "version", "--version":
