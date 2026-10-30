@@ -138,7 +138,7 @@ private struct SafetyTab: View {
                 }
                 Text("This limit is also a ceiling for agents: `lidless start --thermal-stop` can make it "
                      + "stricter, not weaker.").font(.caption).foregroundStyle(.secondary)
-                LabeledContent("Now", value: thermalName(s.thermal))
+                LabeledContent("Now", value: s.heatNow)
             }
             Section("What the levels mean") {
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
@@ -149,10 +149,23 @@ private struct SafetyTab: View {
                         }
                     }
                 }
-                Text("Lidless reads the level that macOS reports (ProcessInfo.thermalState), not a temperature "
-                     + "in degrees. macOS slows the Mac down before it reports Hot, so set a battery limit "
-                     + "and a time limit too.")
+                Text("The heat limit uses the level that macOS reports (ProcessInfo.thermalState). macOS sets "
+                     + "the level from all its sensors and from how hard the Mac works. It is the same signal "
+                     + "that macOS uses to slow the Mac down.")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Section("Temperatures in degrees") {
+                LabeledContent("Chip", value: degrees(s.temps.chip))
+                LabeledContent("Battery", value: degrees(s.temps.battery))
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("• The chip can run at 90–100 °C under heavy work. That is normal. "
+                         + "macOS slows it down before it can take damage.")
+                    Text("• The battery is the part to watch. Heat wears it, and it cools slowly. "
+                         + "At 40 °C or more, the panel tells you not to close the Mac in a bag.")
+                    Text("• These numbers are only an indication. Lidless shows them so that you can check "
+                         + "the Mac before you close it.")
+                }
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Section("When heat is a risk") {
                 VStack(alignment: .leading, spacing: 6) {
@@ -163,7 +176,9 @@ private struct SafetyTab: View {
                     Text("• A MacBook Air has no fan, so it slows down sooner and stays warm longer.")
                 }
                 .fixedSize(horizontal: false, vertical: true)
-                Text("macOS protects the Mac itself: it slows down and, at the end, shuts down. The main risk of "
+                Text("A closed Mac in open air, for example on a desk or carried in your hand, is safe: the vents "
+                     + "on the bottom and at the back still move air. macOS slows the Mac down long before the heat can damage the display. "
+                     + "macOS protects the Mac itself: it slows down and, at the end, shuts down. The main risk of "
                      + "repeated heat is faster battery wear. Damage or a swollen battery is rare, but it is not "
                      + "worth the risk.")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)

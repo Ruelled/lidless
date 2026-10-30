@@ -4,6 +4,15 @@ import Foundation
 
 func thermalName(_ v: Int) -> String { ["Normal", "Warm", "Hot", "Critical"][max(0, min(3, v))] }
 
+/// 57.6 → "58 °C", nil → "—".
+func degrees(_ v: Double?) -> String { v.map { "\(Int($0.rounded())) °C" } ?? "—" }
+
+/// "chip 58 °C, battery 34 °C", or nil if the Mac has neither sensor.
+func temperatures(_ r: Temperature.Reading) -> String? {
+    let parts = [r.chip.map { "chip \(degrees($0))" }, r.battery.map { "battery \(degrees($0))" }].compactMap { $0 }
+    return parts.isEmpty ? nil : parts.joined(separator: ", ")
+}
+
 func durationName(_ minutes: Int) -> String {
     minutes < 60 ? "\(minutes) minutes" : (minutes == 60 ? "1 hour" : "\(minutes / 60) hours")
 }

@@ -242,7 +242,8 @@ enum CLI {
             print("Session: none" + (s.lastStop.map { " (last: \($0))" } ?? ""))
         }
         print("Battery: \(s.battery.map { "\($0)%" } ?? "?")\(s.onAC ? " on mains power" : " on battery")"
-              + ", temperature: \(s.thermal)")
+              + ", temperature: \(s.thermal)"
+              + (temperatures(.init(chip: s.chipTemp, battery: s.batteryTemp)).map { " (\($0))" } ?? ""))
         print("Caffeinate: \(s.caffeinated ? "on" : "off")")
         print("Lid permission: \(s.lidPermission ? "granted" : "not granted"), SleepDisabled: \(s.sleepDisabled ? 1 : 0)")
         return 0

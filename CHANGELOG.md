@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.0 — 2026-10-30
+
+- The panel shows the chip and battery temperature in °C. The sensors are read
+  without root through IOHIDEventSystem (Apple silicon only; other Macs show
+  no value). When the heat level is Warm or worse, or the battery is at 40 °C
+  or more, the panel says that the Mac is too warm for a closed bag.
+- The log records each change of the heat level, with the temperatures. A stop
+  for heat also gives the temperatures.
+- The log records when the Mac goes to sleep during a session, and says when
+  lid mode was off. A session with lid mode off ends in sleep when you close
+  the lid.
+- `lidless status` and `state.json` give `chipTemp` and `batteryTemp`.
+- Settings > Safety has a section about temperatures in degrees, and says that
+  a closed Mac in open air is safe.
+
 ## 0.3.1 — 2026-10-30
 
 Internal refactor, no change in behavior:

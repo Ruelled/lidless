@@ -16,6 +16,9 @@ laptop is in your bag. It is a free, open-source take on the idea behind
   mode.
 - **Sessions with guardrails**: stop after a time, below a battery percentage
   (on battery only), or at a thermal state (Warm, Hot, Critical).
+- **Temperatures**: the panel shows the chip and battery temperature in °C
+  (Apple silicon), and warns when the Mac is too warm to close in a bag.
+  Changes of the heat level go to the log.
 - **Lid closed**: optional. Uses `pmset -a disablesleep 1` and restores the
   previous setting when the session ends, when the app quits, and when the app
   crashes.
@@ -119,7 +122,8 @@ session is active. To fix it by hand: `sudo pmset -a disablesleep 0`.
 
 A closed laptop in a bag gets hot. Keep the battery and time limits on. The
 temperature limit uses the macOS thermal state, and the Mac usually slows
-itself down before it reports "Hot", so do not rely on that limit alone. Use
+itself down before it reports "Hot", so do not rely on that limit alone.
+Check the temperatures in the panel before you close the Mac in a bag. Use
 this software at your own risk; see the [license](LICENSE).
 
 ## Testing

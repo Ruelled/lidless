@@ -58,6 +58,72 @@ enum Brightness {
     }
 }
 
+// MARK: - Temperatures in °C (private IOHIDEventSystem calls in IOKit, loaded at run time, no root needed)
+
+/// The chip and battery sensors of an Apple silicon Mac. Values are nil where a Mac has no such sensor.
+/// These numbers are only an indication. The guardrail uses the heat level that macOS reports.
+enum Temperature {
+    struct Reading: Equatable {
+        var chip: Double?      // the hottest "PMU tdie" sensor on the chip
+        var battery: Double?   // the hottest "gas gauge battery" sensor
+    }
+
+    private typealias CreateFn = @convention(c) (CFAllocator?) -> UnsafeMutableRawPointer?
+    private typealias MatchFn = @convention(c) (UnsafeMutableRawPointer, CFDictionary) -> Int32
+    private typealias ServicesFn = @convention(c) (UnsafeMutableRawPointer) -> Unmanaged<CFArray>?
+    private typealias PropertyFn = @convention(c) (UnsafeRawPointer, CFString) -> Unmanaged<CFTypeRef>?
+    private typealias EventFn = @convention(c) (UnsafeRawPointer, Int64, Int32, Int64) -> UnsafeMutableRawPointer?
+    private typealias FloatFn = @convention(c) (UnsafeMutableRawPointer, Int32) -> Double
+
+    private static let handle = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_LAZY)
+    private static let eventFn: EventFn? = symbol("IOHIDServiceClientCopyEvent")
+    private static let floatFn: FloatFn? = symbol("IOHIDEventGetFloatValue")
+    private static let typeTemperature: Int64 = 15   // kIOHIDEventTypeTemperature
+
+    private static func symbol<T>(_ name: String) -> T? {
+        guard let h = handle, let s = dlsym(h, name) else { return nil }
+        return unsafeBitCast(s, to: T.self)
+    }
+
+    private enum Kind { case chip, battery }
+
+    /// The sensor services, found once. The array keeps them alive for the life of the app.
+    private static let sensors: (list: CFArray, kinds: [(UnsafeRawPointer, Kind)])? = {
+        guard let create: CreateFn = symbol("IOHIDEventSystemClientCreate"),
+              let match: MatchFn = symbol("IOHIDEventSystemClientSetMatching"),
+              let services: ServicesFn = symbol("IOHIDEventSystemClientCopyServices"),
+              let property: PropertyFn = symbol("IOHIDServiceClientCopyProperty"),
+              let client = create(kCFAllocatorDefault) else { return nil }
+        // Page 0xff00, usage 5: the temperature sensors.
+        _ = match(client, ["PrimaryUsagePage": 0xff00, "PrimaryUsage": 5] as CFDictionary)
+        guard let list = services(client)?.takeRetainedValue() else { return nil }
+        var kinds: [(UnsafeRawPointer, Kind)] = []
+        for i in 0..<CFArrayGetCount(list) {
+            guard let s = CFArrayGetValueAtIndex(list, i),
+                  let name = property(s, "Product" as CFString)?.takeRetainedValue() as? String else { continue }
+            if name.hasPrefix("PMU tdie") { kinds.append((s, .chip)) }
+            else if name.hasPrefix("gas gauge battery") { kinds.append((s, .battery)) }
+        }
+        return kinds.isEmpty ? nil : (list, kinds)
+    }()
+
+    static func read() -> Reading {
+        var r = Reading()
+        guard let sensors, let eventFn, let floatFn else { return r }
+        for (s, kind) in sensors.kinds {
+            guard let e = eventFn(s, typeTemperature, 0, 0) else { continue }
+            let v = floatFn(e, Int32(typeTemperature << 16))
+            Unmanaged<CFTypeRef>.fromOpaque(e).release()
+            guard (1..<130).contains(v) else { continue }   // some sensors report nonsense such as -9200
+            switch kind {
+            case .chip: r.chip = max(r.chip ?? v, v)
+            case .battery: r.battery = max(r.battery ?? v, v)
+            }
+        }
+        return r
+    }
+}
+
 // MARK: - App Cleanup
 
 struct RunningApp: Identifiable {

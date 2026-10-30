@@ -54,6 +54,14 @@ check(thermalName(-1), "Normal", "thermal below range")
 check(thermalName(2), "Hot", "thermal")
 check(thermalName(9), "Critical", "thermal above range")
 check(sentence("stops after 2h"), "Stops after 2h.", "sentence")
+check(degrees(57.6), "58 °C", "degrees")
+check(degrees(nil), "—", "degrees without a sensor")
+check(temperatures(.init(chip: 61.2, battery: 34.4)), "chip 61 °C, battery 34 °C", "temperatures")
+check(temperatures(.init(chip: nil, battery: 34)), "battery 34 °C", "temperatures, battery only")
+check(temperatures(.init()), nil, "temperatures, no sensors")
+// A Mac without the sensors (Intel, a CI virtual machine) gives nil. A Mac with them gives a sane value.
+let now = Temperature.read()
+check([now.chip, now.battery].allSatisfy { $0 == nil || (1..<130).contains($0!) }, true, "sensor values in range")
 
 // Session summary.
 let c = Config(endsAfter: 7200, batteryFloor: 20, thermalLimit: 2, lidClosed: true, keepDisplay: false,

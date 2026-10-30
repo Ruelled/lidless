@@ -32,7 +32,7 @@ Always pass `--by` with a short name for yourself, for example `codex` or `claud
 
 ```sh
 lidless status          # human-readable
-lidless status --json   # active, startedBy, endsAt, battery, thermal, lidClosed, ...
+lidless status --json   # active, startedBy, endsAt, battery, thermal, chipTemp, batteryTemp, lidClosed, ...
 ```
 
 ## Stop

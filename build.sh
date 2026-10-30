@@ -5,7 +5,7 @@
 set -eu
 cd "$(dirname "$0")"
 command -v swiftc >/dev/null || { echo "swiftc not found. Install the Xcode Command Line Tools: xcode-select --install"; exit 1; }
-version=0.3.1
+version=0.4.0
 commit=$(git rev-parse HEAD 2>/dev/null || echo unknown)
 app=build/Lidless.app
 rm -rf "$app"

@@ -27,6 +27,7 @@ final class Session: ObservableObject {
     @Published private(set) var battery: Int?
     @Published private(set) var onAC = true
     @Published private(set) var thermal = 0
+    @Published private(set) var temps = Temperature.Reading()
     @Published private(set) var lidPermission = false
 
     private var assertions: [IOPMAssertionID] = []
@@ -34,12 +35,15 @@ final class Session: ObservableObject {
     private var savedBrightness: Float?
     private var watchdog: Process?
     private var wakeObserver: NSObjectProtocol?
+    private var sleepObserver: NSObjectProtocol?
     private var timer: Timer?
     private var lastSensorRead = Date.distantPast
 
     var startedBy: String { holders.first ?? "panel" }
     var holderList: String { holders.joined(separator: ", ") }
     var summary: String { config.map(Self.describe) ?? "" }
+    /// "Hot, chip 98 °C, battery 41 °C"
+    var heatNow: String { ([thermalName(thermal)] + [temperatures(temps)].compactMap { $0 }).joined(separator: ", ") }
 
     init() {
         Pref.register()
@@ -54,6 +58,14 @@ final class Session: ObservableObject {
         t.tolerance = 0.3   // let macOS group this wake-up with others to save energy
         RunLoop.main.add(t, forMode: .common)
         timer = t
+        // A Mac that sleeps during a session did not stay awake. Say so in the log, with the likely reason.
+        sleepObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self, self.active else { return }
+            Log.write("The Mac goes to sleep during the session"
+                      + (self.config?.lidClosed == true ? "" : ". Lid mode is off, so a closed lid sleeps the Mac"))
+        }
     }
 
     static func describe(_ c: Config) -> String {
@@ -225,12 +237,17 @@ final class Session: ObservableObject {
         guard active, let c = config else { return }
         if let end = endsAt, now >= end { stop("Time limit reached") }
         else if let floor = c.batteryFloor, !onAC, let b = battery, b <= floor { stop("Battery at \(b)%") }
-        else if let limit = c.thermalLimit, thermal >= limit { stop("Mac too hot (\(thermalName(thermal)))") }
+        else if let limit = c.thermalLimit, thermal >= limit { stop("Mac too hot (\(heatNow))") }
     }
 
     private func readSensors() {
         lastSensorRead = Date()
-        thermal = ProcessInfo.processInfo.thermalState.rawValue
+        let level = ProcessInfo.processInfo.thermalState.rawValue
+        temps = Temperature.read()
+        if level != thermal {
+            thermal = level
+            Log.write("Heat level: \(heatNow)")
+        }
         guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
               let list = IOPSCopyPowerSourcesList(info)?.takeRetainedValue() as? [CFTypeRef] else { return }
         for source in list {

@@ -34,6 +34,8 @@ struct LidlessState: Codable {
     var battery: Int?
     var onAC: Bool
     var thermal: String
+    var chipTemp: Double?
+    var batteryTemp: Double?
     var lidPermission: Bool
     var sleepDisabled: Bool
     var lastStop: String?
@@ -147,7 +149,9 @@ final class Control {
             startedAt: c == nil ? nil : s.startedAt, endsAt: c == nil ? nil : s.endsAt,
             batteryFloor: c?.batteryFloor, thermalStop: c?.thermalLimit.map { thermalName($0).lowercased() },
             lidClosed: c?.lidClosed ?? false, caffeinated: Caffeinate.shared.on, battery: s.battery, onAC: s.onAC,
-            thermal: thermalName(s.thermal).lowercased(), lidPermission: s.lidPermission,
+            thermal: thermalName(s.thermal).lowercased(),
+            chipTemp: s.temps.chip.map { ($0 * 10).rounded() / 10 }, batteryTemp: s.temps.battery.map { ($0 * 10).rounded() / 10 },
+            lidPermission: s.lidPermission,
             sleepDisabled: Lid.sleepDisabled(), lastStop: s.lastStop, lastCommand: lastReply, updatedAt: Date())
         try? FileManager.default.createDirectory(at: Paths.support, withIntermediateDirectories: true)
         if let data = try? LidlessState.encoder.encode(state) { try? data.write(to: Paths.state, options: .atomic) }

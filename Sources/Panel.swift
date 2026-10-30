@@ -89,6 +89,19 @@ struct Panel: View {
         }
     }
 
+    /// Warm or worse, or a battery at 40 °C or more: not the moment to close the Mac in a bag.
+    private var tooWarmForBag: Bool { s.thermal >= 1 || (s.temps.battery ?? 0) >= 40 }
+
+    /// "Chip 58 °C · Battery 34 °C", orange with a hint when the Mac is warm.
+    @ViewBuilder private var temperatureLine: some View {
+        if let t = temperatures(s.temps) {
+            Text((t.prefix(1).uppercased() + t.dropFirst()).replacingOccurrences(of: ", ", with: " · ")
+                 + (tooWarmForBag ? ". Too warm for a closed bag. Let it cool first." : ""))
+                .font(.caption).foregroundStyle(tooWarmForBag ? Color.orange : .secondary)
+                .help("Measured by the Mac's own sensors. The heat limit uses the level that macOS reports.")
+        }
+    }
+
     private var batteryNow: String { s.battery.map { "\($0)%" + (s.onAC ? " ⚡︎" : "") } ?? "—" }
 
     private var setup: some View {
@@ -124,6 +137,7 @@ struct Panel: View {
                     Text("Now: \(thermalName(s.thermal))").foregroundStyle(.secondary)
                 }
             }
+            temperatureLine
             if !useThermal {
                 Text("No heat limit. Not recommended.").font(.caption).foregroundStyle(.red)
             }
@@ -215,6 +229,7 @@ struct Panel: View {
                     }
                 }
             }
+            temperatureLine
             Text(c?.lidClosed == true ? "Lidless is running. You can close the lid."
                                       : "Lidless is running. Keep the lid open.")
                 .font(.callout).foregroundStyle(.secondary).frame(maxWidth: .infinity)
