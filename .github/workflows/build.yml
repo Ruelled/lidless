@@ -6,7 +6,7 @@ jobs:
   build:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: ./test.sh
       - run: ./build.sh --no-install
       - run: lipo -archs build/Lidless.app/Contents/MacOS/Lidless

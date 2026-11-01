@@ -10,7 +10,7 @@ jobs:
   release:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: ./test.sh
       - run: LIDLESS_CHANNEL=release ./build.sh --no-install
       - name: Check that the tag matches the app version
