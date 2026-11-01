@@ -171,9 +171,15 @@ enum AppCleanup {
 }
 
 final class CleanupList: ObservableObject {
-    static let shared = CleanupList()
-    @Published var ids: [String] = UserDefaults.standard.stringArray(forKey: Pref.cleanupApps) ?? [] {
-        didSet { UserDefaults.standard.set(ids, forKey: Pref.cleanupApps) }
+    static let shared = CleanupList(key: Pref.cleanupApps)
+    static let dark = CleanupList(key: Pref.darkCleanupApps)
+    private let key: String
+    @Published var ids: [String] { didSet { UserDefaults.standard.set(ids, forKey: key) } }
+
+    private init(key: String) {
+        Pref.register()
+        self.key = key
+        ids = UserDefaults.standard.stringArray(forKey: key) ?? []
     }
 
     func toggle(_ id: String) {

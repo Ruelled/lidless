@@ -14,14 +14,20 @@ struct Config {
     var cleanupApps: [String]   // bundle identifiers
     var reopenApps: Bool
 
-    /// Go Dark: the same limits and App Cleanup, but every display sleeps at once and the built-in
-    /// display goes to minimum brightness. Waking a display does not stop the session.
-    func dark(brightnessAvailable: Bool) -> Config {
+    /// Go Dark: a night session. Every display sleeps at once. The Mac screen keeps its brightness,
+    /// so any key (F2 too) wakes it at full light. The battery, heat and lid settings stay the same.
+    var dark = false
+
+    func dark(apps: [String], reopen: Bool, endsAfter: TimeInterval?, stopOnWake: Bool) -> Config {
         var c = self
+        c.dark = true
         c.keepDisplay = false
         c.sleepDisplay = true
-        c.stopOnWake = false
-        c.minBrightness = brightnessAvailable
+        c.minBrightness = false
+        c.stopOnWake = stopOnWake
+        c.cleanupApps = apps
+        c.reopenApps = reopen
+        c.endsAfter = endsAfter
         return c
     }
 }
@@ -44,6 +50,11 @@ enum Pref {
     static let autoUpdate = "autoUpdateCheck"
     static let caffeinateFlags = "caffeinateFlags"
     static let caffeinateMinutes = "caffeinateMinutes"
+    static let darkCleanupApps = "darkCleanupApps"
+    static let darkReopenApps = "darkReopenApps"
+    static let darkUseDuration = "darkUseDuration"
+    static let darkMinutes = "darkMinutes"
+    static let darkStopOnWake = "darkStopOnWake"
 
     static let durations = [30, 60, 120, 240, 480]
     static let floors = [10, 15, 20, 25, 30, 40, 50]
@@ -54,7 +65,11 @@ enum Pref {
             allowLid: false, keepDisplay: false, sleepDisplay: false, stopOnWake: false, minBrightness: false,
             cleanupApps: [String](), reopenApps: true, notifications: true, autoUpdate: true,
             caffeinateFlags: "dimsu", caffeinateMinutes: 0,
+            darkReopenApps: true, darkUseDuration: false, darkMinutes: 480, darkStopOnWake: false,
         ])
+        // Go Dark starts with the App Cleanup list, once. After that the two lists are separate.
+        let d = UserDefaults.standard
+        if d.object(forKey: darkCleanupApps) == nil { d.set(d.stringArray(forKey: cleanupApps) ?? [], forKey: darkCleanupApps) }
     }
 
     /// The session that the panel's Start button would start.
@@ -71,5 +86,15 @@ enum Pref {
             minBrightness: d.bool(forKey: minBrightness),
             cleanupApps: d.stringArray(forKey: cleanupApps) ?? [],
             reopenApps: d.bool(forKey: reopenApps))
+    }
+
+    /// The session that the panel's Go Dark button would start.
+    static func darkConfig() -> Config {
+        let d = UserDefaults.standard
+        return config().dark(
+            apps: d.stringArray(forKey: darkCleanupApps) ?? [],
+            reopen: d.bool(forKey: darkReopenApps),
+            endsAfter: d.bool(forKey: darkUseDuration) ? TimeInterval(d.integer(forKey: darkMinutes) * 60) : nil,
+            stopOnWake: d.bool(forKey: darkStopOnWake))
     }
 }

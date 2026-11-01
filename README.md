@@ -25,11 +25,13 @@ laptop is in your bag. It is a free, open-source take on the idea behind
 - **Command line and agent skill**: `lidless start/stop/status`, so a coding
   agent can start a session with limits and stop it when its work is done.
 - **Go Lidless and Go Dark**: two buttons start a session. Go Lidless uses
-  the settings in the panel. Go Dark uses the same limits and App Cleanup, then
-  puts every display to sleep with `pmset displaysleepnow` and sets the
-  built-in display to minimum brightness. External monitors go to standby,
-  because they get no signal. A mouse movement or a key wakes them, and the
-  session continues.
+  the settings in the panel. Go Dark is for the night and has its own tab in
+  Settings: its own list of apps to quit, its own time limit (none by
+  default), and an option to stop when a display wakes. It puts every display
+  to sleep with `pmset displaysleepnow`, so external monitors go to standby.
+  Go Dark does not dim the Mac screen. Any key, F2 too, wakes the displays at
+  their normal brightness, and the session continues. All displays wake
+  together, because macOS cannot wake only one.
 - **App Cleanup**: quit selected apps at the start of a session to save
   battery, and reopen them at the end.
 - Display options: keep the display awake, set the built-in display to minimum

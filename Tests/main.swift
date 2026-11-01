@@ -71,14 +71,17 @@ var open = c
 open.endsAfter = nil; open.batteryFloor = nil; open.thermalLimit = nil; open.lidClosed = false
 check(Session.describe(open), "no time limit, no battery limit, no heat limit, lid open", "summary without limits")
 
-// Go Dark keeps the limits and App Cleanup, and always sleeps the displays.
+// Go Dark keeps the battery, heat and lid limits, uses its own apps and time limit, and never dims.
 var awake = c
-awake.keepDisplay = true; awake.stopOnWake = true; awake.cleanupApps = ["com.apple.Music"]
-let dark = awake.dark(brightnessAvailable: true)
-check(dark.sleepDisplay && !dark.keepDisplay && !dark.stopOnWake && dark.minBrightness, true, "dark display settings")
-check(dark.cleanupApps, ["com.apple.Music"], "dark keeps App Cleanup")
-check(Session.describe(dark), Session.describe(c), "dark keeps the limits")
-check(awake.dark(brightnessAvailable: false).minBrightness, false, "dark without a built-in display")
+awake.keepDisplay = true; awake.minBrightness = true; awake.cleanupApps = ["com.apple.Music"]
+let dark = awake.dark(apps: ["com.apple.Safari"], reopen: false, endsAfter: nil, stopOnWake: false)
+check(dark.dark && dark.sleepDisplay && !dark.keepDisplay && !dark.stopOnWake, true, "dark display settings")
+check(dark.minBrightness, false, "dark never dims, so a key wakes the Mac screen at full light")
+check(dark.cleanupApps, ["com.apple.Safari"], "dark uses its own apps")
+check(dark.reopenApps, false, "dark uses its own reopen setting")
+check([dark.batteryFloor, dark.thermalLimit], [20, 2], "dark keeps the battery and heat limits")
+check(dark.lidClosed, true, "dark keeps the lid setting")
+check(Session.describe(dark), "no time limit, below 20%, at Hot, lid may close, Go Dark", "dark summary")
 
 print(failures == 0 ? "All \(checks) checks passed." : "\(failures) of \(checks) checks failed.")
 exit(failures == 0 ? 0 : 1)

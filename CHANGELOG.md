@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.0 — 2026-11-01
+
+- Settings has a Go Dark tab. Go Dark has its own list of apps to quit, its
+  own reopen setting, its own time limit (none by default) and the option
+  "Stop Go Dark when a display wakes" (off by default). At the first start,
+  the Go Dark list is a copy of the App Cleanup list.
+- Go Dark no longer sets the Mac screen to minimum brightness. Version 0.5.0
+  did, so a key press woke the Mac screen at brightness 0. Now any key, F2
+  too, wakes every display at its normal brightness.
+- The panel has a Go Dark row, in the same style as the App Cleanup row.
+- The log records when the displays wake during Go Dark. `lidless settings
+  dark` opens the new tab.
+
 ## 0.5.0 — 2026-11-01
 
 - Two buttons replace Start Session: a blue **Go Lidless** button and a green

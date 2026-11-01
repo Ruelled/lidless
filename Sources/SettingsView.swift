@@ -4,7 +4,7 @@ import SwiftUI
 import AppKit
 
 /// The raw value is the name for `lidless settings <tab>`.
-enum SettingsTab: String, CaseIterable { case general, safety, caffeinate, lid, cleanup, agents }
+enum SettingsTab: String, CaseIterable { case general, safety, caffeinate, lid, cleanup, dark, agents }
 
 final class SettingsRouter: ObservableObject {
     static let shared = SettingsRouter()
@@ -41,6 +41,7 @@ struct SettingsView: View {
             CaffeinateTab().tabItem { Label("Caffeinate", systemImage: "cup.and.saucer") }.tag(SettingsTab.caffeinate)
             LidTab().tabItem { Label("Lid", systemImage: "laptopcomputer") }.tag(SettingsTab.lid)
             CleanupTab().tabItem { Label("App Cleanup", systemImage: "xmark.app") }.tag(SettingsTab.cleanup)
+            DarkTab().tabItem { Label("Go Dark", systemImage: "moon") }.tag(SettingsTab.dark)
             AgentsTab().tabItem { Label("Agents", systemImage: "terminal") }.tag(SettingsTab.agents)
         }
         .padding(20)
@@ -306,9 +307,7 @@ private struct LidTab: View {
 // MARK: - App Cleanup
 
 private struct CleanupTab: View {
-    @ObservedObject private var list = CleanupList.shared
     @AppStorage(Pref.reopenApps) private var reopenApps = true
-    @State private var apps = AppCleanup.candidates()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -319,32 +318,79 @@ private struct CleanupTab: View {
             Text("Do not select the app that runs your agent, for example your terminal.")
                 .font(.caption).foregroundStyle(.orange)
             Toggle("Reopen these apps when the session stops", isOn: $reopenApps)
-            List {
-                ForEach(apps) { app in
-                    HStack {
-                        Toggle("", isOn: Binding(get: { list.ids.contains(app.id) }, set: { _ in list.toggle(app.id) }))
-                            .labelsHidden()
-                        if let icon = app.icon { Image(nsImage: icon).resizable().frame(width: 18, height: 18) }
-                        Text(app.name)
-                        Spacer()
-                        Text(ByteCountFormatter.string(fromByteCount: Int64(app.memory), countStyle: .memory))
-                            .foregroundStyle(.secondary).monospacedDigit()
-                    }
-                }
-                ForEach(list.ids.filter { id in !apps.contains { $0.id == id } }, id: \.self) { id in
-                    HStack {
-                        Toggle("", isOn: Binding(get: { true }, set: { _ in list.toggle(id) })).labelsHidden()
-                        Text(id).foregroundStyle(.secondary)
-                        Spacer()
-                        Text("not running").foregroundStyle(.secondary)
-                    }
+            AppPicker(list: CleanupList.shared)
+        }
+        .toggleStyle(.checkbox)
+    }
+}
+
+/// The list of apps with a checkbox each. App Cleanup and Go Dark each have one.
+private struct AppPicker: View {
+    @ObservedObject var list: CleanupList
+    @State private var apps = AppCleanup.candidates()
+
+    var body: some View {
+        List {
+            ForEach(apps) { app in
+                HStack {
+                    Toggle("", isOn: Binding(get: { list.ids.contains(app.id) }, set: { _ in list.toggle(app.id) }))
+                        .labelsHidden()
+                    if let icon = app.icon { Image(nsImage: icon).resizable().frame(width: 18, height: 18) }
+                    Text(app.name)
+                    Spacer()
+                    Text(ByteCountFormatter.string(fromByteCount: Int64(app.memory), countStyle: .memory))
+                        .foregroundStyle(.secondary).monospacedDigit()
                 }
             }
+            ForEach(list.ids.filter { id in !apps.contains { $0.id == id } }, id: \.self) { id in
+                HStack {
+                    Toggle("", isOn: Binding(get: { true }, set: { _ in list.toggle(id) })).labelsHidden()
+                    Text(id).foregroundStyle(.secondary)
+                    Spacer()
+                    Text("not running").foregroundStyle(.secondary)
+                }
+            }
+        }
+        .toggleStyle(.checkbox)
+        HStack {
+            Text("Memory column: physical footprint now.").font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            Button("Refresh") { apps = AppCleanup.candidates() }
+        }
+    }
+}
+
+// MARK: - Go Dark
+
+private struct DarkTab: View {
+    @AppStorage(Pref.darkReopenApps) private var reopen = true
+    @AppStorage(Pref.darkUseDuration) private var useDuration = false
+    @AppStorage(Pref.darkMinutes) private var minutes = 480
+    @AppStorage(Pref.darkStopOnWake) private var stopOnWake = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Go Dark is for the night. It starts a session, quits the apps below and puts every display "
+                 + "to sleep, also each external monitor.").bold().fixedSize(horizontal: false, vertical: true)
+            Text("Press any key to wake the displays, for example F2 on the MacBook. The Mac screen comes back "
+                 + "at its normal brightness. All displays wake together: macOS cannot wake only one.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text("The battery limit, the heat limit and \"Allow the lid to close\" come from the panel.")
+                .font(.caption).foregroundStyle(.secondary)
             HStack {
-                Text("Memory column: physical footprint now.").font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Button("Refresh") { apps = AppCleanup.candidates() }
+                Toggle("Stop after", isOn: $useDuration)
+                Picker("", selection: $minutes) {
+                    ForEach(Pref.durations, id: \.self) { Text(durationName($0)).tag($0) }
+                }.labelsHidden().fixedSize().disabled(!useDuration)
+                Text(useDuration ? "" : "No time limit: the session runs until you stop it.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
+            Toggle("Stop Go Dark when a display wakes", isOn: $stopOnWake)
+            Toggle("Reopen these apps when Go Dark stops", isOn: $reopen)
+            Text("Apps to quit when you click Go Dark:")
+            Text("Do not select the app that runs your agent, for example your terminal.")
+                .font(.caption).foregroundStyle(.orange)
+            AppPicker(list: CleanupList.dark)
         }
         .toggleStyle(.checkbox)
     }

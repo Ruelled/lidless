@@ -73,6 +73,7 @@ final class Session: ObservableObject {
          c.batteryFloor.map { "below \($0)%" } ?? "no battery limit",
          c.thermalLimit.map { "at \(thermalName($0))" } ?? "no heat limit",
          c.lidClosed ? "lid may close" : "lid open"].joined(separator: ", ")
+            + (c.dark ? ", Go Dark" : "")
     }
 
     // MARK: Start, join, leave, stop
@@ -109,7 +110,7 @@ final class Session: ObservableObject {
         if c.sleepDisplay && !c.keepDisplay {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { Shell.run(Lid.pmset, ["displaysleepnow"]) }
         }
-        if c.stopOnWake { watchDisplayWake() }
+        if c.stopOnWake || c.dark { watchDisplayWake(stop: c.stopOnWake) }
 
         Log.write("Session started by \(source): \(summary)")
         Notifier.post("Lidless session started", sentence(summary))
@@ -261,12 +262,19 @@ final class Session: ObservableObject {
     }
 
     /// Stops the session when the display wakes. Starts after 5 seconds, so that the start itself does not count.
-    private func watchDisplayWake() {
+    /// stop: end the session when a display wakes. Otherwise only write the wake to the log.
+    private func watchDisplayWake(stop: Bool) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
-            guard let self, self.active else { return }
+            guard let self, self.active, self.wakeObserver == nil else { return }
             self.wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
                 forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main
-            ) { [weak self] _ in self?.stop("Display woke") }
+            ) { [weak self] _ in
+                guard let self else { return }
+                if stop { self.stop("Display woke"); return }
+                // Go Dark never dims, but give the screen its light back at once if anything did.
+                if let b = self.savedBrightness { Brightness.set(b); self.savedBrightness = nil }
+                Log.write("Displays woke. The session continues.")
+            }
         }
     }
 

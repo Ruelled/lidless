@@ -71,6 +71,9 @@ struct Panel: View {
     @AppStorage(Pref.stopOnWake) private var stopOnWake = false
     @AppStorage(Pref.minBrightness) private var minBrightness = false
     @AppStorage(Pref.reopenApps) private var reopenApps = true
+    @ObservedObject private var darkApps = CleanupList.dark
+    @AppStorage(Pref.darkUseDuration) private var darkUseDuration = false
+    @AppStorage(Pref.darkMinutes) private var darkMinutes = 480
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -170,6 +173,20 @@ struct Panel: View {
                     Image(systemName: "chevron.right").foregroundStyle(.secondary)
                 }.contentShape(Rectangle())
             }.buttonStyle(.plain)
+            Button { SettingsWindow.show(.dark) } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Go Dark")
+                        Text([darkApps.ids.isEmpty ? "No apps quit"
+                              : "\(darkApps.ids.count) app\(darkApps.ids.count == 1 ? "" : "s") quit",
+                              darkUseDuration ? "stops after \(durationName(darkMinutes))" : "no time limit",
+                              "every display sleeps"].joined(separator: " · "))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right").foregroundStyle(.secondary)
+                }.contentShape(Rectangle())
+            }.buttonStyle(.plain)
             Divider()
             Toggle("Allow the lid to close (also on battery)", isOn: $lidClosed)
             if lidClosed {
@@ -211,8 +228,8 @@ struct Panel: View {
                     Label("Go Dark", systemImage: "moon.fill").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(BigButton(color: Color(red: 0.13, green: 0.58, blue: 0.27)))
-                .help("Start a session with the settings above, then put every display to sleep. "
-                      + "External monitors go to standby. Moving the mouse wakes them; the session continues.")
+                .help("Quit the Go Dark apps and put every display to sleep. Any key wakes them, F2 too. "
+                      + "The session continues.")
             }
             .padding(.bottom, 4)
         }
@@ -221,7 +238,7 @@ struct Panel: View {
 
     /// Start the night session, close the panel, and let the displays sleep.
     private func goDark() {
-        let c = Pref.config().dark(brightnessAvailable: Brightness.available)
+        let c = Pref.darkConfig()
         if s.start(c, by: "panel") == nil { MenuPanel.close() }
     }
 
@@ -261,8 +278,9 @@ struct Panel: View {
                 }
             }
             temperatureLine
-            Text(c?.lidClosed == true ? "Lidless is running. You can close the lid."
-                                      : "Lidless is running. Keep the lid open.")
+            Text(c?.dark == true ? "Go Dark is running. Press any key to wake the displays."
+                 : c?.lidClosed == true ? "Lidless is running. You can close the lid."
+                                        : "Lidless is running. Keep the lid open.")
                 .font(.callout).foregroundStyle(.secondary).frame(maxWidth: .infinity)
             Button { s.stop("Stopped by you") } label: {
                 Text("Stop Session").frame(maxWidth: .infinity)
