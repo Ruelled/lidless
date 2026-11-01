@@ -50,10 +50,9 @@ Requires macOS 13 or later. Apple silicon and Intel.
 1. Download `Lidless-<version>.zip` from the
    [latest release](https://github.com/Ruelled/lidless/releases/latest) and open it.
 2. Move `Lidless.app` to your Applications folder, then open it.
-3. macOS says that it cannot check the app, because Lidless is not notarized
-   by Apple. Open **System Settings > Privacy & Security**, scroll down, and
-   click **Open Anyway**. Or run once in Terminal:
-   `xattr -dr com.apple.quarantine /Applications/Lidless.app`
+3. Releases from 0.10.1 are signed with Developer ID and notarized by Apple,
+   so the app opens without a warning. To check where a download was built:
+   `gh attestation verify Lidless-<version>.zip -R Ruelled/lidless`
 4. For the `lidless` command, open Lidless **Settings > Agents** and click
    **Install**.
 

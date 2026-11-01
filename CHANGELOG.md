@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.1 — 2026-11-01
+
+- Releases are signed with Developer ID and notarized by Apple, so a
+  downloaded copy opens without a security warning.
+- Each release records build provenance on GitHub. Check a download with
+  `gh attestation verify Lidless-<version>.zip -R Ruelled/lidless`.
+- The signing keys are GitHub secrets in a protected "release" environment:
+  each release run waits for the owner's approval. Only an admin can make,
+  move or delete a `v*` tag.
+
 ## 0.10.0 — 2026-11-01
 
 - Releases: each version tag builds a zip of Lidless.app on GitHub Actions

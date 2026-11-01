@@ -59,7 +59,10 @@ the built-in display, and turn off externals only while it is on.
 
 Release: set `version` in `build.sh`, add a `## <version>` section to
 `CHANGELOG.md`, commit, then push the tag `v<version>`. The `release` workflow
-tests, builds with `LIDLESS_CHANNEL=release`, and publishes the zip.
+tests, builds with `LIDLESS_CHANNEL=release`, signs with Developer ID,
+notarizes, records build provenance, and publishes the zip. The run waits
+for the owner's approval in the GitHub "release" environment, which holds
+the signing secrets. A `v*` tag ruleset lets only admins make or move tags.
 
 Build with Command Line Tools 27: they have no SwiftUI macro plugin, so
 `sdk.sh` selects a macOS 26 SDK.
