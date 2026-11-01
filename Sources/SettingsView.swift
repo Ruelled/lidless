@@ -343,12 +343,14 @@ private struct AppPicker: View {
                 }
             }
             ForEach(list.ids.filter { id in !apps.contains { $0.id == id } }, id: \.self) { id in
+                let app = AppCleanup.installed(id)
                 HStack {
                     Toggle("", isOn: Binding(get: { true }, set: { _ in list.toggle(id) })).labelsHidden()
-                    Text(id).foregroundStyle(.secondary)
+                    if let icon = app?.icon { Image(nsImage: icon).resizable().frame(width: 18, height: 18) }
+                    Text(app?.name ?? id).foregroundStyle(app == nil ? .secondary : .primary)
                     Spacer()
-                    Text("not running").foregroundStyle(.secondary)
-                }
+                    Text(app == nil ? "not installed" : "not running").foregroundStyle(.secondary)
+                }.help(id)
             }
         }
         .toggleStyle(.checkbox)

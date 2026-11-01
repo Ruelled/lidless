@@ -10,6 +10,9 @@
   did, so a key press woke the Mac screen at brightness 0. Now any key, F2
   too, wakes every display at its normal brightness.
 - The panel has a Go Dark row, in the same style as the App Cleanup row.
+- A selected app that does not run now shows its name and icon from the
+  installed app, not its bundle identifier. An app that is not installed
+  shows "not installed".
 - The log records when the displays wake during Go Dark. `lidless settings
   dark` opens the new tab.
 

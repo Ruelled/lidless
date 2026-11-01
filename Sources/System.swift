@@ -145,6 +145,13 @@ enum AppCleanup {
         }.sorted { $0.memory > $1.memory }
     }
 
+    /// The name and icon of an installed app that does not run now. Nil when the app is not installed.
+    static func installed(_ id: String) -> (name: String, icon: NSImage)? {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { return nil }
+        let name = FileManager.default.displayName(atPath: url.path)
+        return (name.hasSuffix(".app") ? String(name.dropLast(4)) : name, NSWorkspace.shared.icon(forFile: url.path))
+    }
+
     /// Asks the selected apps to quit (they can still ask to save). Returns what to reopen later.
     static func quit(_ ids: [String]) -> [URL] {
         var urls: [URL] = []
