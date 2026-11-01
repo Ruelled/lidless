@@ -9,6 +9,13 @@ permissions:
 jobs:
   release:
     runs-on: macos-latest
+    env:
+      # Optional. With these secrets the app is signed with Developer ID and notarized by Apple.
+      DEVELOPER_ID_P12: ${{ secrets.DEVELOPER_ID_P12 }}
+      DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+      NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+      NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+      NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
     steps:
       - uses: actions/checkout@v7
       - run: ./test.sh
@@ -17,6 +24,28 @@ jobs:
         run: |
           v=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" build/Lidless.app/Contents/Info.plist)
           [ "v$v" = "$GITHUB_REF_NAME" ] || { echo "Tag $GITHUB_REF_NAME does not match version $v in build.sh"; exit 1; }
+      - name: Sign with Developer ID and notarize
+        if: env.DEVELOPER_ID_P12 != ''
+        run: |
+          kc="$RUNNER_TEMP/signing.keychain-db"; kp=$(uuidgen)
+          security create-keychain -p "$kp" "$kc"
+          security set-keychain-settings -lut 3600 "$kc"
+          security unlock-keychain -p "$kp" "$kc"
+          echo "$DEVELOPER_ID_P12" | base64 --decode > "$RUNNER_TEMP/id.p12"
+          security import "$RUNNER_TEMP/id.p12" -k "$kc" -P "$DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$kp" "$kc" > /dev/null
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+          codesign --force --options runtime --timestamp --keychain "$kc" \
+            --sign "Developer ID Application" build/Lidless.app
+          codesign --verify --strict --deep --verbose=2 build/Lidless.app
+          ditto -c -k --keepParent build/Lidless.app "$RUNNER_TEMP/notarize.zip"
+          echo "$NOTARY_KEY_P8" | base64 --decode > "$RUNNER_TEMP/key.p8"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" --key "$RUNNER_TEMP/key.p8" \
+            --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" --wait
+          xcrun stapler staple build/Lidless.app
+          spctl --assess --type execute --verbose=2 build/Lidless.app
+          rm -f "$RUNNER_TEMP/id.p12" "$RUNNER_TEMP/key.p8"
+          security delete-keychain "$kc"
       - name: Package
         run: |
           cd build
@@ -32,14 +61,18 @@ jobs:
 
           1. Download `Lidless-<version>.zip` below and open it.
           2. Move `Lidless.app` to your Applications folder, then open it.
-          3. macOS says that it cannot check the app, because Lidless is not notarized by Apple.
-             Open **System Settings > Privacy & Security**, scroll down, and click **Open Anyway**.
-             Or run once in Terminal: `xattr -dr com.apple.quarantine /Applications/Lidless.app`
+          3. EOF_STEP3
           4. For the `lidless` command, open Lidless **Settings > Agents** and click **Install**.
 
           To update: quit Lidless, then replace the app with the new one.
           Check the download: `shasum -a 256 -c Lidless-<version>.zip.sha256`
           EOF
+          if [ -n "$DEVELOPER_ID_P12" ]; then
+            step3="The app is signed with Developer ID and notarized by Apple, so it opens without a warning."
+          else
+            step3="macOS says that it cannot check the app, because this build is not notarized. Open **System Settings > Privacy & Security**, scroll down, and click **Open Anyway**. Or run once in Terminal: \`xattr -dr com.apple.quarantine /Applications/Lidless.app\`"
+          fi
+          awk -v t="$step3" '{ if ($0 == "3. EOF_STEP3") print "3. " t; else print }' notes.md > notes.tmp && mv notes.tmp notes.md
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
