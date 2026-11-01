@@ -13,6 +13,17 @@ struct Config {
     var minBrightness: Bool
     var cleanupApps: [String]   // bundle identifiers
     var reopenApps: Bool
+
+    /// Go Dark: the same limits and App Cleanup, but every display sleeps at once and the built-in
+    /// display goes to minimum brightness. Waking a display does not stop the session.
+    func dark(brightnessAvailable: Bool) -> Config {
+        var c = self
+        c.keepDisplay = false
+        c.sleepDisplay = true
+        c.stopOnWake = false
+        c.minBrightness = brightnessAvailable
+        return c
+    }
 }
 
 enum Pref {

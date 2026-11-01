@@ -71,5 +71,14 @@ var open = c
 open.endsAfter = nil; open.batteryFloor = nil; open.thermalLimit = nil; open.lidClosed = false
 check(Session.describe(open), "no time limit, no battery limit, no heat limit, lid open", "summary without limits")
 
+// Go Dark keeps the limits and App Cleanup, and always sleeps the displays.
+var awake = c
+awake.keepDisplay = true; awake.stopOnWake = true; awake.cleanupApps = ["com.apple.Music"]
+let dark = awake.dark(brightnessAvailable: true)
+check(dark.sleepDisplay && !dark.keepDisplay && !dark.stopOnWake && dark.minBrightness, true, "dark display settings")
+check(dark.cleanupApps, ["com.apple.Music"], "dark keeps App Cleanup")
+check(Session.describe(dark), Session.describe(c), "dark keeps the limits")
+check(awake.dark(brightnessAvailable: false).minBrightness, false, "dark without a built-in display")
+
 print(failures == 0 ? "All \(checks) checks passed." : "\(failures) of \(checks) checks failed.")
 exit(failures == 0 ? 0 : 1)

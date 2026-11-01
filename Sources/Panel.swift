@@ -66,6 +66,7 @@ struct Panel: View {
         }
         .padding(16)
         .frame(width: 400)
+        .fixedSize(horizontal: false, vertical: true)   // the window takes the full height, bottom padding included
         .background(WindowReader { MenuPanel.window = $0 })
     }
 
@@ -186,12 +187,29 @@ struct Panel: View {
             if let e = s.error ?? caffeinate.error { Text(e).font(.caption).foregroundStyle(.red) }
             if let l = s.lastStop { Text("Last session: \(l)").font(.caption).foregroundStyle(.secondary) }
 
-            Button { s.start(Pref.config()) } label: {
-                Text("Start Session").frame(maxWidth: .infinity)
+            HStack(spacing: 10) {
+                Button { s.start(Pref.config()) } label: {
+                    Label("Go Lidless", systemImage: "figure.walk").frame(maxWidth: .infinity)
+                }
+                .tint(.blue)
+                .help("Start a session with the settings above.")
+                Button { goDark() } label: {
+                    Label("Go Dark", systemImage: "moon.fill").frame(maxWidth: .infinity)
+                }
+                .tint(.green)
+                .help("Start a session with the settings above, then put every display to sleep. "
+                      + "External monitors go to standby. Moving the mouse wakes them; the session continues.")
             }
             .buttonStyle(.borderedProminent).controlSize(.large)
+            .padding(.bottom, 4)
         }
         .toggleStyle(.checkbox)
+    }
+
+    /// Start the night session, close the panel, and let the displays sleep.
+    private func goDark() {
+        let c = Pref.config().dark(brightnessAvailable: Brightness.available)
+        if s.start(c, by: "panel") == nil { MenuPanel.close() }
     }
 
     private var running: some View {
@@ -237,6 +255,7 @@ struct Panel: View {
                 Text("Stop Session").frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent).tint(.red).controlSize(.large)
+            .padding(.bottom, 4)
         }
     }
 }

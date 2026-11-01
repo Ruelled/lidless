@@ -24,6 +24,12 @@ laptop is in your bag. It is a free, open-source take on the idea behind
   crashes.
 - **Command line and agent skill**: `lidless start/stop/status`, so a coding
   agent can start a session with limits and stop it when its work is done.
+- **Go Lidless and Go Dark**: two buttons start a session. Go Lidless uses
+  the settings in the panel. Go Dark uses the same limits and App Cleanup, then
+  puts every display to sleep with `pmset displaysleepnow` and sets the
+  built-in display to minimum brightness. External monitors go to standby,
+  because they get no signal. A mouse movement or a key wakes them, and the
+  session continues.
 - **App Cleanup**: quit selected apps at the start of a session to save
   battery, and reopen them at the end.
 - Display options: keep the display awake, set the built-in display to minimum

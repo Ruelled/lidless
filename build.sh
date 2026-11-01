@@ -4,8 +4,9 @@
 #   ./build.sh --no-install  build only (CI)
 set -eu
 cd "$(dirname "$0")"
+. ./sdk.sh
 command -v swiftc >/dev/null || { echo "swiftc not found. Install the Xcode Command Line Tools: xcode-select --install"; exit 1; }
-version=0.4.0
+version=0.5.0
 commit=$(git rev-parse HEAD 2>/dev/null || echo unknown)
 app=build/Lidless.app
 rm -rf "$app"

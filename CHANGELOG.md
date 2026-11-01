@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.0 — 2026-11-01
+
+- Two buttons replace Start Session: a blue **Go Lidless** button and a green
+  **Go Dark** button. Go Dark is for the night. It starts the session with the
+  limits and App Cleanup from the panel, closes the panel, puts every display
+  to sleep and sets the built-in display to minimum brightness. A wake of a
+  display does not stop a Go Dark session.
+- The panel keeps its bottom padding. The button at the bottom no longer
+  touches the edge of the panel.
+- `build.sh` and `test.sh` use a macOS 26 SDK when the Command Line Tools have
+  no SwiftUI macro plugin. Command Line Tools 27 cannot compile `@State` with
+  the macOS 27 SDK.
+
 ## 0.4.0 — 2026-10-30
 
 - The panel shows the chip and battery temperature in °C. The sensors are read
