@@ -7,41 +7,37 @@ Use it when a coding agent (Claude Code, Codex, …) must keep working while the
 laptop is in your bag. It is a free, open-source take on the idea behind
 [SleepWalk](https://sleepwalk.app).
 
+<img src="docs/panel.png" width="440" alt="The Lidless panel">
+
 ## Features
 
-- **Caffeinate switch**: runs `/usr/bin/caffeinate` until you switch it off or
-  quit Lidless. Choose the flags (`-d -i -m -s -u`, default `-dimsu`) and an
-  optional time limit in Settings > Caffeinate. On mains power, `-s` also keeps
-  the Mac awake with the lid closed. On battery, use a session with lid-closed
-  mode.
-- **Sessions with guardrails**: stop after a time, below a battery percentage
-  (on battery only), or at a thermal state (Warm, Hot, Critical).
+- **Two buttons**:
+  - **Go Lidless** starts a session with the limits in the panel. Use it when
+    the Mac works in your bag.
+  - **Go Dark** is for the night at your desk. It makes the displays dark and
+    runs without a time limit by default.
+- **Guardrails**: a session stops after a time, below a battery percentage
+  (on battery only), or at a heat level (Warm, Hot, Critical).
 - **Temperatures**: the panel shows the chip and battery temperature in °C
   (Apple silicon), and warns when the Mac is too warm to close in a bag.
-  Changes of the heat level go to the log.
 - **Lid closed**: optional. Uses `pmset -a disablesleep 1` and restores the
   previous setting when the session ends, when the app quits, and when the app
   crashes.
+- **Quit apps**: Go Lidless and Go Dark each have a list of apps to quit at
+  the start and to reopen at the end. A "Quit apps" switch in the panel keeps
+  every app open for one session.
+- **Go Dark displays**: choose one of two modes in Settings > Go Dark.
+  - **All displays sleep** (`pmset displaysleepnow`). Any key wakes all of
+    them. With a dock, this can lock the screen and reset USB devices.
+  - **A setting for each display**. The Mac screen stays on at a brightness
+    from 6% to 100%, so the brightness key works at once. Each external
+    display can **turn off** (the monitor goes to standby, as with a pulled
+    cable), go black, or dim. A watchdog turns the displays on again if
+    Lidless crashes.
+- **Caffeinate switch**: runs `/usr/bin/caffeinate` until you switch it off.
+  Choose the flags (default `-dimsu`) and an optional time limit.
 - **Command line and agent skill**: `lidless start/stop/status`, so a coding
   agent can start a session with limits and stop it when its work is done.
-- **Go Lidless and Go Dark**: two buttons start a session. Go Lidless uses
-  the settings in the panel. Go Dark is for the night and has its own tab in
-  Settings: its own list of apps to quit, its own time limit (none by
-  default), a "Quit apps" switch, the list of displays that go dark, and an
-  option to stop when a display wakes. It puts every display
-  to sleep with `pmset displaysleepnow`, so external monitors go to standby.
-  With "A setting for each display", no display sleeps: the Mac screen gets a
-  brightness slider that cannot go below 6%, and each external display gets
-  a "Turn off" checkbox (the monitor goes to standby, as with a pulled cable)
-  or a slider from Black to Unchanged. A watchdog turns the displays on again
-  if Lidless crashes.
-  Go Dark does not dim the Mac screen in "All displays sleep" mode. Any key, F2 too, wakes the displays at
-  their normal brightness, and the session continues. All displays wake
-  together, because macOS cannot wake only one.
-- **App Cleanup** (the Go Lidless tab): quit selected apps at the start of a session to save
-  battery, and reopen them at the end.
-- Display options: keep the display awake, set the built-in display to minimum
-  brightness, put the display to sleep on start, stop when the display wakes.
 - Notifications when a session starts or stops, with the reason.
 - Settings window: open at login, lid permission, update check, logs, agents.
 
@@ -89,7 +85,7 @@ success, 1 failure, 2 usage error.
 **Several agents.** When a session is active, `start` joins it: each `--by`
 name becomes a holder, and the end time moves later if needed. `stop --by
 <name>` removes one holder, and the session ends when no holder is left.
-`stop` without `--by` ends it for everyone. App Cleanup never quits the app
+`stop` without `--by` ends it for everyone. Go Lidless never quits the app
 that sent the command, for example the agent's terminal.
 
 The command and the app talk through a distributed notification (local

@@ -94,6 +94,18 @@ check(offOne.darkScreens?.off, ["A"], "per display: the displays to turn off pas
 check(Session.describe(each), "no time limit, below 20%, at Hot, lid may close, Go Dark per display",
       "per display summary")
 
+// The Go Dark display summary in the panel.
+check(darkDisplaySummary(perDisplay: false, displays: 3, mac: 0.06, externals: [nil, 0]), "3 displays sleep",
+      "summary, all sleep")
+check(darkDisplaySummary(perDisplay: false, displays: 1, mac: 1, externals: []), "1 display sleep",
+      "summary, one display")
+check(darkDisplaySummary(perDisplay: true, displays: 3, mac: 0.0625, externals: [nil, nil]), "Mac 6% · 2 off",
+      "summary, two off")
+check(darkDisplaySummary(perDisplay: true, displays: 4, mac: 0.5, externals: [nil, 0, 0.4]),
+      "Mac 50% · 1 off · 1 black · 1 dim", "summary, mixed")
+check(darkDisplaySummary(perDisplay: true, displays: 2, mac: 1, externals: [1]), "Mac 100%",
+      "summary, external unchanged")
+
 // The "Quit apps" switch. register(defaults:) keeps the values in memory, so the test writes nothing.
 // Do not call Pref.register() here: it stores a copy of the App Cleanup list.
 UserDefaults.standard.register(defaults: [Pref.darkCleanupApps: ["com.apple.Music"], Pref.darkQuitApps: true])

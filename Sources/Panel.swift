@@ -224,19 +224,11 @@ struct Panel: View {
 
     private func appCount(_ n: Int) -> String { n == 0 ? "no apps selected" : "\(n) app\(n == 1 ? "" : "s") quit" }
 
-    /// "3 displays sleep", or "Mac 6% · 2 black" with a setting for each display.
     private var darkDisplays: String {
-        let n = screens.displays.count
-        guard darkPerDisplay else { return "\(n) display\(n == 1 ? "" : "s") sleep" }
-        let all = screens.displays.filter { !$0.builtIn }
-        let offCount = DisplayPower.available ? all.filter { Pref.darkTurnOff($0.uuid) }.count : 0
-        let ext = all.filter { !(DisplayPower.available && Pref.darkTurnOff($0.uuid)) }.map { Pref.darkLevel($0.uuid) }
-        let black = ext.filter { $0 <= 0.005 }.count, same = ext.filter { $0 >= 0.995 }.count
-        let dim = ext.count - black - same
-        return (["Mac \(Int((darkMac * 100).rounded()))%"]
-                + [offCount > 0 ? "\(offCount) off" : nil, black > 0 ? "\(black) black" : nil,
-                   dim > 0 ? "\(dim) dim" : nil].compactMap { $0 })
-            .joined(separator: " · ")
+        darkDisplaySummary(perDisplay: darkPerDisplay, displays: screens.displays.count, mac: darkMac,
+                           externals: screens.displays.filter { !$0.builtIn }.map {
+                               DisplayPower.available && Pref.darkTurnOff($0.uuid) ? nil : Pref.darkLevel($0.uuid)
+                           })
     }
 
     /// A row with a title and a summary that opens a Settings tab, and a "Quit apps" switch.

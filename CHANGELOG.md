@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.1 — 2026-11-01
+
+- Settings > Go Dark warns that "All displays sleep" can lock the screen and
+  reset USB devices behind a dock.
+- Internal, no other change in behavior: the display code moved to
+  `Displays.swift`, and the Go Dark tab and the app list moved to
+  `SettingsDark.swift`. The panel's display summary is a pure function with
+  unit tests. `Tests/integration.sh` checks the hidden `displays-on` command.
+- The README has a screenshot of the panel and a shorter feature list.
+
 ## 0.9.0 — 2026-11-01
 
 - Go Dark, "A setting for each display": each external display has a

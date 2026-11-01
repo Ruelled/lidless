@@ -40,3 +40,17 @@ func shortTime(_ date: Date) -> String { timeFormatter.string(from: date) }
 
 /// "stops after 2h, …" → "Stops after 2h, ….".
 func sentence(_ s: String) -> String { s.prefix(1).uppercased() + s.dropFirst() + "." }
+
+/// The Go Dark display summary in the panel: "3 displays sleep", or "Mac 6% · 2 off · 1 dim".
+/// externals: for each external display, nil when it turns off, else its level (0 black, 1 unchanged).
+func darkDisplaySummary(perDisplay: Bool, displays: Int, mac: Double, externals: [Double?]) -> String {
+    guard perDisplay else { return "\(displays) display\(displays == 1 ? "" : "s") sleep" }
+    let off = externals.filter { $0 == nil }.count
+    let levels = externals.compactMap { $0 }
+    let black = levels.filter { $0 <= 0.005 }.count
+    let dim = levels.filter { $0 > 0.005 && $0 < 0.995 }.count
+    return (["Mac \(Int((mac * 100).rounded()))%"]
+            + [off > 0 ? "\(off) off" : nil, black > 0 ? "\(black) black" : nil, dim > 0 ? "\(dim) dim" : nil]
+              .compactMap { $0 })
+        .joined(separator: " · ")
+}

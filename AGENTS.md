@@ -24,9 +24,12 @@ session is active, restore normal sleep with `sudo pmset -a disablesleep 0`.
 - `Sources/Caffeinate.swift`: the Caffeinate switch (`/usr/bin/caffeinate`).
 - `Sources/Control.swift`: the app side of commands, and `state.json`.
 - `Sources/CLI.swift`: the `lidless` command line.
-- `Sources/System.swift`: shell, brightness, App Cleanup, notifications, log.
+- `Sources/System.swift`: shell, app lists (quit and reopen), notifications, log.
+- `Sources/Displays.swift`: Mac screen brightness, the display list, the color
+  table (black or dim) and the software disconnect (off) with its watchdog.
 - `Sources/Integrations.swift`: open at login, update check, `lidless` wrapper, skills.
-- `Sources/Panel.swift`, `Sources/SettingsView.swift`: the UI.
+- `Sources/Panel.swift`, `Sources/SettingsView.swift`, `Sources/SettingsDark.swift`: the UI.
+  The Go Lidless tab still has the internal name `cleanup` (`lidless settings cleanup`).
 - `Sources/Prefs.swift`: saved settings and their defaults.
 - `Sources/Format.swift`: text for the UI, the log and the command line.
 - `skill/SKILL.md`: the agent skill, copied into the app bundle.
@@ -46,4 +49,13 @@ integration check in `Tests/integration.sh` for each new command. Record each
 change in `CHANGELOG.md`.
 
 Do not use `pmset displaysleepnow` on a desktop setup: it locks the screen and
-can reset USB devices behind a dock.
+can reset USB devices behind a dock. Go Dark "All displays sleep" uses it and
+says so in its tab; "A setting for each display" does not use it.
+
+A display that Lidless turned off (`CGSConfigureDisplayEnabled`) stays off
+when the app crashes, also with `.forAppOnly`; this was tested 2026-11-01.
+Keep the saved list, the watchdog and the restore at launch. Never turn off
+the built-in display, and turn off externals only while it is on.
+
+Build with Command Line Tools 27: they have no SwiftUI macro plugin, so
+`sdk.sh` selects a macOS 26 SDK.

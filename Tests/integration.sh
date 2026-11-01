@@ -47,5 +47,12 @@ else
   echo "skip lid tests (no lid permission, or SleepDisabled is already 1)"
 fi
 
+# displays-on is the hidden command of the display watchdog. It must not change a display that is on,
+# and it must accept an id that does not exist. It never turns a display off, so this test is safe.
+before=$(system_profiler SPDisplaysDataType 2>/dev/null | grep -c Resolution)
+expect "displays-on without ids"        0 $L displays-on
+expect "displays-on with an unknown id" 0 $L displays-on 999999
+after=$(system_profiler SPDisplaysDataType 2>/dev/null | grep -c Resolution)
+[ "$before" = "$after" ] && ok "displays-on changes no display" || bad "displays-on changed the displays ($before -> $after)"
 echo "$pass passed, $fail failed"
 [ $fail = 0 ]
