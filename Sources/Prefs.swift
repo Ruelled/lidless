@@ -2,6 +2,14 @@
 
 import Foundation
 
+/// Go Dark with a setting for each display, instead of display sleep.
+struct DarkScreens: Equatable {
+    /// Lowest Mac screen brightness: one step of the brightness key. The Mac screen never goes off.
+    static let macFloor: Float = 1.0 / 16
+    var mac: Float                    // brightness of the Mac screen, macFloor...1
+    var externals: [String: Double]   // display UUID -> level: 0 black, 1 unchanged
+}
+
 struct Config {
     var endsAfter: TimeInterval?
     var batteryFloor: Int?
@@ -18,11 +26,17 @@ struct Config {
     /// so any key (F2 too) wakes it at full light. The battery, heat and lid settings stay the same.
     var dark = false
 
-    func dark(apps: [String], reopen: Bool, endsAfter: TimeInterval?, stopOnWake: Bool) -> Config {
+    /// screens == nil: every display sleeps. Otherwise each display gets its own level and none sleeps.
+    var darkScreens: DarkScreens? = nil
+
+    func dark(apps: [String], reopen: Bool, endsAfter: TimeInterval?, stopOnWake: Bool,
+              screens: DarkScreens? = nil) -> Config {
         var c = self
         c.dark = true
+        c.darkScreens = screens.map { DarkScreens(mac: max(DarkScreens.macFloor, min(1, $0.mac)),
+                                                  externals: $0.externals.mapValues { max(0, min(1, $0)) }) }
         c.keepDisplay = false
-        c.sleepDisplay = true
+        c.sleepDisplay = screens == nil
         c.minBrightness = false
         c.stopOnWake = stopOnWake
         c.cleanupApps = apps
@@ -56,6 +70,10 @@ enum Pref {
     static let darkMinutes = "darkMinutes"
     static let darkStopOnWake = "darkStopOnWake"
     static let darkQuitApps = "darkQuitApps"
+    static let darkPerDisplay = "darkPerDisplay"
+    static let darkMacBrightness = "darkMacBrightness"
+    static let darkLevels = "darkDisplayLevels"
+    static let quitApps = "quitApps"
 
     static let durations = [30, 60, 120, 240, 480]
     static let floors = [10, 15, 20, 25, 30, 40, 50]
@@ -67,6 +85,7 @@ enum Pref {
             cleanupApps: [String](), reopenApps: true, notifications: true, autoUpdate: true,
             caffeinateFlags: "dimsu", caffeinateMinutes: 0,
             darkReopenApps: true, darkUseDuration: false, darkMinutes: 480, darkStopOnWake: false, darkQuitApps: true,
+            darkPerDisplay: false, darkMacBrightness: Double(DarkScreens.macFloor), quitApps: true,
         ])
         // Go Dark starts with the App Cleanup list, once. After that the two lists are separate.
         let d = UserDefaults.standard
@@ -85,7 +104,7 @@ enum Pref {
             sleepDisplay: d.bool(forKey: sleepDisplay),
             stopOnWake: d.bool(forKey: stopOnWake),
             minBrightness: d.bool(forKey: minBrightness),
-            cleanupApps: d.stringArray(forKey: cleanupApps) ?? [],
+            cleanupApps: d.bool(forKey: quitApps) ? d.stringArray(forKey: cleanupApps) ?? [] : [],
             reopenApps: d.bool(forKey: reopenApps))
     }
 
@@ -96,6 +115,24 @@ enum Pref {
             apps: d.bool(forKey: darkQuitApps) ? d.stringArray(forKey: darkCleanupApps) ?? [] : [],
             reopen: d.bool(forKey: darkReopenApps),
             endsAfter: d.bool(forKey: darkUseDuration) ? TimeInterval(d.integer(forKey: darkMinutes) * 60) : nil,
-            stopOnWake: d.bool(forKey: darkStopOnWake))
+            stopOnWake: d.bool(forKey: darkStopOnWake) && !d.bool(forKey: darkPerDisplay),
+            screens: d.bool(forKey: darkPerDisplay) ? darkScreens() : nil)
+    }
+
+    /// Level of an external display in Go Dark: 0 black (the default), 1 unchanged.
+    static func darkLevel(_ uuid: String) -> Double {
+        (UserDefaults.standard.dictionary(forKey: darkLevels) as? [String: Double])?[uuid] ?? 0
+    }
+
+    static func setDarkLevel(_ uuid: String, _ v: Double) {
+        var all = UserDefaults.standard.dictionary(forKey: darkLevels) as? [String: Double] ?? [:]
+        all[uuid] = v
+        UserDefaults.standard.set(all, forKey: darkLevels)
+    }
+
+    static func darkScreens() -> DarkScreens {
+        let ext = DisplayList.shared.displays.filter { !$0.builtIn }
+        return DarkScreens(mac: Float(UserDefaults.standard.double(forKey: darkMacBrightness)),
+                           externals: Dictionary(uniqueKeysWithValues: ext.map { ($0.uuid, darkLevel($0.uuid)) }))
     }
 }

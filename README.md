@@ -30,10 +30,13 @@ laptop is in your bag. It is a free, open-source take on the idea behind
   default), a "Quit apps" switch, the list of displays that go dark, and an
   option to stop when a display wakes. It puts every display
   to sleep with `pmset displaysleepnow`, so external monitors go to standby.
-  Go Dark does not dim the Mac screen. Any key, F2 too, wakes the displays at
+  With "A setting for each display", no display sleeps: the Mac screen gets a
+  brightness slider that cannot go below 6%, and each external display gets
+  a slider from Black to Unchanged.
+  Go Dark does not dim the Mac screen in "All displays sleep" mode. Any key, F2 too, wakes the displays at
   their normal brightness, and the session continues. All displays wake
   together, because macOS cannot wake only one.
-- **App Cleanup**: quit selected apps at the start of a session to save
+- **App Cleanup** (the Go Lidless tab): quit selected apps at the start of a session to save
   battery, and reopen them at the end.
 - Display options: keep the display awake, set the built-in display to minimum
   brightness, put the display to sleep on start, stop when the display wakes.

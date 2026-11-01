@@ -40,12 +40,12 @@ struct SettingsView: View {
             SafetyTab().tabItem { Label("Safety", systemImage: "thermometer.medium") }.tag(SettingsTab.safety)
             CaffeinateTab().tabItem { Label("Caffeinate", systemImage: "cup.and.saucer") }.tag(SettingsTab.caffeinate)
             LidTab().tabItem { Label("Lid", systemImage: "laptopcomputer") }.tag(SettingsTab.lid)
-            CleanupTab().tabItem { Label("App Cleanup", systemImage: "xmark.app") }.tag(SettingsTab.cleanup)
+            CleanupTab().tabItem { Label("Go Lidless", systemImage: "figure.walk") }.tag(SettingsTab.cleanup)
             DarkTab().tabItem { Label("Go Dark", systemImage: "moon") }.tag(SettingsTab.dark)
             AgentsTab().tabItem { Label("Agents", systemImage: "terminal") }.tag(SettingsTab.agents)
         }
         .padding(20)
-        .frame(width: 580, height: 680)
+        .frame(width: 620, height: 760)
     }
 }
 
@@ -142,10 +142,12 @@ private struct SafetyTab: View {
                 LabeledContent("Now", value: s.heatNow)
             }
             Section("What the levels mean") {
-                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
+                // A Grid inside a Form row gets the wrong height and overlaps the next text.
+                VStack(alignment: .leading, spacing: 6) {
                     ForEach(Array(Self.levels.enumerated()), id: \.offset) { i, level in
-                        GridRow {
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
                             Text(level.name).bold().foregroundStyle(i == s.thermal ? Color.accentColor : .primary)
+                                .frame(width: 70, alignment: .leading)
                             Text(level.meaning).fixedSize(horizontal: false, vertical: true)
                         }
                     }
@@ -308,17 +310,22 @@ private struct LidTab: View {
 
 private struct CleanupTab: View {
     @AppStorage(Pref.reopenApps) private var reopenApps = true
+    @AppStorage(Pref.quitApps) private var quitApps = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Selected apps quit when you start a session, not now. They open again when the session stops.")
-                .bold()
-            Text("This saves battery while the Mac works in a bag. An app with unsaved work can still ask you to save.")
-                .font(.caption).foregroundStyle(.secondary)
+            Text("Go Lidless quits the selected apps when the session starts, not now. They open again when "
+                 + "the session stops.").bold().fixedSize(horizontal: false, vertical: true)
+            Text("This saves battery while the Mac works in a bag. An app with unsaved work can still ask you to save. "
+                 + "A session that an agent starts uses this list too.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 16) {
+                Toggle("Quit the apps below", isOn: $quitApps)
+                Toggle("Reopen them when the session stops", isOn: $reopenApps).disabled(!quitApps)
+            }
             Text("Do not select the app that runs your agent, for example your terminal.")
                 .font(.caption).foregroundStyle(.orange)
-            Toggle("Reopen these apps when the session stops", isOn: $reopenApps)
-            AppPicker(list: CleanupList.shared)
+            AppPicker(list: CleanupList.shared).disabled(!quitApps).opacity(quitApps ? 1 : 0.5)
         }
         .toggleStyle(.checkbox)
     }
@@ -373,32 +380,31 @@ private struct DarkTab: View {
     @AppStorage(Pref.darkMinutes) private var minutes = 480
     @AppStorage(Pref.darkStopOnWake) private var stopOnWake = false
     @AppStorage(Pref.darkQuitApps) private var quitApps = true
+    @AppStorage(Pref.darkPerDisplay) private var perDisplay = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Go Dark is for the night. It starts a session, quits the apps below and puts every display "
-                 + "to sleep.").bold().fixedSize(horizontal: false, vertical: true)
-            Text("Press any key to wake the displays, for example F2 on the MacBook. The Mac screen comes back "
-                 + "at its normal brightness. The battery limit, the heat limit and \"Allow the lid to close\" "
-                 + "come from the panel.")
+            Text("Go Dark is for the night. It starts a session, quits the apps below and makes the displays "
+                 + "dark.").bold().fixedSize(horizontal: false, vertical: true)
+            Text("The battery limit, the heat limit and \"Allow the lid to close\" come from the panel.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             GroupBox {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(screens.displays) { d in
-                        HStack {
-                            Image(systemName: d.builtIn ? "laptopcomputer" : "display")
-                                .frame(width: 20).foregroundStyle(.secondary)
-                            Text(d.name + (d.builtIn ? " (Mac screen)" : ""))
-                            Spacer()
-                            Text(d.pixels).foregroundStyle(.secondary).monospacedDigit()
-                        }
-                    }
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker("", selection: $perDisplay) {
+                        Text("All displays sleep").tag(false)
+                        Text("A setting for each display").tag(true)
+                    }.pickerStyle(.segmented).labelsHidden()
+                    ForEach(screens.displays) { d in DisplayRow(d: d, perDisplay: perDisplay) }
                     if screens.displays.isEmpty { Text("No display found.").foregroundStyle(.secondary) }
-                    Text("All of them sleep and all of them wake together. macOS cannot put only one to sleep. "
-                         + "A display that is off or not connected now is not in this list.")
+                    Text(perDisplay
+                         ? "No display sleeps. The Mac screen stays on at its brightness, so F2 makes it brighter "
+                           + "at once. It can never go off. An external display goes black or dim; its backlight "
+                           + "stays on. Every display comes back when Go Dark stops."
+                         : "All displays sleep and all wake together when you press a key. macOS cannot put "
+                           + "only one to sleep. Choose \"A setting for each display\" to keep the Mac screen on.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }.frame(maxWidth: .infinity, alignment: .leading)
-            } label: { Text("Displays that go dark: \(screens.displays.count)") }
+            } label: { Text("Displays: \(screens.displays.count) connected now") }
             HStack {
                 Toggle("Stop after", isOn: $useDuration)
                 Picker("", selection: $minutes) {
@@ -407,7 +413,8 @@ private struct DarkTab: View {
                 Text(useDuration ? "" : "No time limit: the session runs until you stop it.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Toggle("Stop Go Dark when a display wakes", isOn: $stopOnWake)
+            Toggle("Stop Go Dark when a display wakes", isOn: $stopOnWake).disabled(perDisplay)
+                .help(perDisplay ? "Only for \"All displays sleep\"." : "")
             HStack(spacing: 16) {
                 Toggle("Quit the apps below", isOn: $quitApps)
                 Toggle("Reopen them when Go Dark stops", isOn: $reopen).disabled(!quitApps)
@@ -418,6 +425,38 @@ private struct DarkTab: View {
         }
         .toggleStyle(.checkbox)
         .onAppear { screens.refresh() }
+    }
+}
+
+/// One display in the Go Dark tab. The Mac screen has a brightness slider with a floor; an external
+/// display has a level from Black to Unchanged.
+private struct DisplayRow: View {
+    let d: DisplayInfo
+    let perDisplay: Bool
+    @AppStorage(Pref.darkMacBrightness) private var mac = Double(DarkScreens.macFloor)
+    @State private var level = 0.0
+
+    var body: some View {
+        HStack {
+            Image(systemName: d.builtIn ? "laptopcomputer" : "display").frame(width: 20).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(d.name).lineLimit(1).truncationMode(.middle)
+                Text((d.builtIn ? "Mac screen · " : "") + d.pixels).font(.caption).foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }.frame(width: 200, alignment: .leading)
+            if !perDisplay {
+                Spacer()
+                Text("Sleeps").foregroundStyle(.secondary)
+            } else if d.builtIn {
+                Slider(value: $mac, in: Double(DarkScreens.macFloor)...1)
+                Text("Brightness \(Int((mac * 100).rounded()))%").monospacedDigit().frame(width: 110, alignment: .trailing)
+            } else {
+                Slider(value: Binding(get: { level }, set: { level = $0; Pref.setDarkLevel(d.uuid, $0) }), in: 0...1)
+                Text(level <= 0.005 ? "Black" : level >= 0.995 ? "Unchanged" : "Dim \(Int((level * 100).rounded()))%")
+                    .monospacedDigit().frame(width: 110, alignment: .trailing)
+            }
+        }
+        .onAppear { level = Pref.darkLevel(d.uuid) }
     }
 }
 

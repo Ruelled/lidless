@@ -183,6 +183,18 @@ struct DisplayInfo: Identifiable, Equatable {
     let name: String
     let builtIn: Bool
     let pixels: String   // "3024 × 1964"
+    let uuid: String     // stays the same when the display reconnects
+}
+
+/// Dims or blacks out a display through its color table. Works on every display, also without DDC.
+/// macOS resets the table when Lidless quits or crashes, so a display cannot stay black.
+enum Gamma {
+    static func set(_ id: CGDirectDisplayID, _ level: Double) {
+        let v = CGGammaValue(max(0, min(1, level)))
+        CGSetDisplayTransferByFormula(id, 0, v, 1, 0, v, 1, 0, v, 1)
+    }
+
+    static func restoreAll() { CGDisplayRestoreColorSyncSettings() }
 }
 
 final class DisplayList: ObservableObject {
@@ -203,8 +215,10 @@ final class DisplayList: ObservableObject {
             else { return nil }
             let id = CGDirectDisplayID(n.uint32Value)
             let mode = CGDisplayCopyDisplayMode(id)
+            let uuid = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue()
             return DisplayInfo(id: id, name: screen.localizedName, builtIn: CGDisplayIsBuiltin(id) != 0,
-                               pixels: mode.map { "\($0.pixelWidth) × \($0.pixelHeight)" } ?? "")
+                               pixels: mode.map { "\($0.pixelWidth) × \($0.pixelHeight)" } ?? "",
+                               uuid: uuid.flatMap { CFUUIDCreateString(nil, $0) as String? } ?? "id-\(id)")
         }
         .sorted { ($0.builtIn ? 0 : 1, $0.name) < ($1.builtIn ? 0 : 1, $1.name) }
     }

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.0 — 2026-11-01
+
+- App Cleanup is now **Go Lidless**: the tab and the panel row have the new
+  name. The Go Lidless row has a "Quit apps" switch, like the Go Dark row.
+  With the switch off, a session keeps every app open. A session that an
+  agent starts uses the same switch.
+- Go Dark has a second display mode, "A setting for each display". No
+  display sleeps. The Mac screen gets a brightness slider. Its lowest value
+  is one step of the brightness key (6%), so the Mac screen never goes off
+  and F2 makes it brighter at once. Each external display gets a slider from
+  Black to Unchanged. Lidless uses the color table of the display, which
+  works without DDC. macOS resets the table when Lidless quits or crashes.
+  Every display comes back when Go Dark stops. "All displays sleep" stays
+  the default.
+- Settings > Safety: the heat levels no longer overlap the text below them.
+
 ## 0.7.0 — 2026-11-01
 
 - The Go Dark row in the panel has a "Quit apps" switch. Switch it off, and

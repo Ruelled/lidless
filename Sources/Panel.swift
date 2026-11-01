@@ -75,6 +75,9 @@ struct Panel: View {
     @AppStorage(Pref.darkUseDuration) private var darkUseDuration = false
     @AppStorage(Pref.darkMinutes) private var darkMinutes = 480
     @AppStorage(Pref.darkQuitApps) private var darkQuitApps = true
+    @AppStorage(Pref.darkPerDisplay) private var darkPerDisplay = false
+    @AppStorage(Pref.darkMacBrightness) private var darkMac = Double(DarkScreens.macFloor)
+    @AppStorage(Pref.quitApps) private var quitApps = true
     @ObservedObject private var screens = DisplayList.shared
 
     var body: some View {
@@ -162,42 +165,15 @@ struct Panel: View {
                 Text("No heat limit. Not recommended.").font(.caption).foregroundStyle(.red)
             }
             Divider()
-            Button { SettingsWindow.show(.cleanup) } label: {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("App Cleanup")
-                        Text(cleanup.ids.isEmpty ? "No apps selected"
-                             : "\(cleanup.ids.count) app\(cleanup.ids.count == 1 ? "" : "s") quit at session start"
-                               + (reopenApps ? " · Reopen after session" : ""))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right").foregroundStyle(.secondary)
-                }.contentShape(Rectangle())
-            }.buttonStyle(.plain)
-            HStack {
-                Button { SettingsWindow.show(.dark) } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Go Dark")
-                            Text([darkQuitApps ? (darkApps.ids.isEmpty ? "no apps selected"
-                                    : "\(darkApps.ids.count) app\(darkApps.ids.count == 1 ? "" : "s") quit")
-                                  : "all apps stay open",
-                                  darkUseDuration ? "stops after \(durationName(darkMinutes))" : "no time limit",
-                                  "\(screens.displays.count) display\(screens.displays.count == 1 ? "" : "s") sleep"]
-                                 .joined(separator: " · "))
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                    }.contentShape(Rectangle())
-                }.buttonStyle(.plain)
-                .help(screens.displays.map(\.name).joined(separator: ", "))
-                Toggle("Quit apps", isOn: $darkQuitApps).toggleStyle(.switch).controlSize(.mini)
-                    .help("Off: Go Dark keeps every app open.")
-                Button { SettingsWindow.show(.dark) } label: {
-                    Image(systemName: "chevron.right").foregroundStyle(.secondary)
-                }.buttonStyle(.plain).accessibilityLabel("Go Dark settings")
-            }
+            optionRow(title: "Go Lidless", tab: .cleanup, quit: $quitApps, detail: [
+                quitApps ? appCount(cleanup.ids.count) : "all apps stay open",
+                quitApps && reopenApps && !cleanup.ids.isEmpty ? "reopen after session" : nil,
+            ])
+            optionRow(title: "Go Dark", tab: .dark, quit: $darkQuitApps, detail: [
+                darkQuitApps ? appCount(darkApps.ids.count) : "all apps stay open",
+                darkUseDuration ? "stops after \(durationName(darkMinutes))" : "no time limit",
+                darkDisplays,
+            ])
             Divider()
             Toggle("Allow the lid to close (also on battery)", isOn: $lidClosed)
             if lidClosed {
@@ -239,12 +215,45 @@ struct Panel: View {
                     Label("Go Dark", systemImage: "moon.fill").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(BigButton(color: Color(red: 0.13, green: 0.58, blue: 0.27)))
-                .help("Quit the Go Dark apps and put every display to sleep. Any key wakes them, F2 too. "
-                      + "The session continues.")
+                .help("Quit the Go Dark apps and make the displays dark. The session continues until you stop it.")
             }
             .padding(.bottom, 4)
         }
         .toggleStyle(.checkbox)
+    }
+
+    private func appCount(_ n: Int) -> String { n == 0 ? "no apps selected" : "\(n) app\(n == 1 ? "" : "s") quit" }
+
+    /// "3 displays sleep", or "Mac 6% · 2 black" with a setting for each display.
+    private var darkDisplays: String {
+        let n = screens.displays.count
+        guard darkPerDisplay else { return "\(n) display\(n == 1 ? "" : "s") sleep" }
+        let ext = screens.displays.filter { !$0.builtIn }.map { Pref.darkLevel($0.uuid) }
+        let black = ext.filter { $0 <= 0.005 }.count, same = ext.filter { $0 >= 0.995 }.count
+        let dim = ext.count - black - same
+        return (["Mac \(Int((darkMac * 100).rounded()))%"]
+                + [black > 0 ? "\(black) black" : nil, dim > 0 ? "\(dim) dim" : nil].compactMap { $0 })
+            .joined(separator: " · ")
+    }
+
+    /// A row with a title and a summary that opens a Settings tab, and a "Quit apps" switch.
+    private func optionRow(title: String, tab: SettingsTab, quit: Binding<Bool>, detail: [String?]) -> some View {
+        HStack {
+            Button { SettingsWindow.show(tab) } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                        Text(detail.compactMap { $0 }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }.contentShape(Rectangle())
+            }.buttonStyle(.plain)
+            Toggle("Quit apps", isOn: quit).toggleStyle(.switch).controlSize(.mini)
+                .help("Off: \(title) keeps every app open.")
+            Button { SettingsWindow.show(tab) } label: {
+                Image(systemName: "chevron.right").foregroundStyle(.secondary)
+            }.buttonStyle(.plain).accessibilityLabel("\(title) settings")
+        }
     }
 
     /// Start the night session, close the panel, and let the displays sleep.
@@ -289,7 +298,8 @@ struct Panel: View {
                 }
             }
             temperatureLine
-            Text(c?.dark == true ? "Go Dark is running. Press any key to wake the displays."
+            Text(c?.dark == true ? (c?.darkScreens == nil ? "Go Dark is running. Press any key to wake the displays."
+                                   : "Go Dark is running. Stop it to light the displays again.")
                  : c?.lidClosed == true ? "Lidless is running. You can close the lid."
                                         : "Lidless is running. Keep the lid open.")
                 .font(.callout).foregroundStyle(.secondary).frame(maxWidth: .infinity)

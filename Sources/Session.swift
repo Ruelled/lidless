@@ -33,6 +33,7 @@ final class Session: ObservableObject {
     private var assertions: [IOPMAssertionID] = []
     private var activity: NSObjectProtocol?
     private var savedBrightness: Float?
+    private var gammaApplied = Date.distantPast
     private var watchdog: Process?
     private var wakeObserver: NSObjectProtocol?
     private var sleepObserver: NSObjectProtocol?
@@ -73,7 +74,7 @@ final class Session: ObservableObject {
          c.batteryFloor.map { "below \($0)%" } ?? "no battery limit",
          c.thermalLimit.map { "at \(thermalName($0))" } ?? "no heat limit",
          c.lidClosed ? "lid may close" : "lid open"].joined(separator: ", ")
-            + (c.dark ? ", Go Dark" : "")
+            + (c.dark ? (c.darkScreens == nil ? ", Go Dark" : ", Go Dark per display") : "")
     }
 
     // MARK: Start, join, leave, stop
@@ -107,6 +108,10 @@ final class Session: ObservableObject {
         let quit = c.cleanupApps.isEmpty ? [] : AppCleanup.quit(c.cleanupApps)
         appsToReopen = c.reopenApps ? quit : []
         if c.minBrightness, let b = Brightness.get(), Brightness.set(0) { savedBrightness = b }
+        if let ds = c.darkScreens {
+            if let b = Brightness.get(), Brightness.set(ds.mac) { savedBrightness = b }
+            applyGamma(ds)
+        }
         if c.sleepDisplay && !c.keepDisplay {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { Shell.run(Lid.pmset, ["displaysleepnow"]) }
         }
@@ -166,6 +171,7 @@ final class Session: ObservableObject {
         wakeObserver = nil
         if let b = savedBrightness { Brightness.set(b) }
         savedBrightness = nil
+        if config?.darkScreens != nil { Gamma.restoreAll() }
         AppCleanup.reopen(appsToReopen)
         appsToReopen = []
         holders = []
@@ -236,9 +242,18 @@ final class Session: ObservableObject {
         }
         if Control.shared.isStale(busy: active || Caffeinate.shared.on) { Control.shared.writeState() }
         guard active, let c = config else { return }
+        // macOS resets the color table after a display change or a wake. Apply it again.
+        if let ds = c.darkScreens, now.timeIntervalSince(gammaApplied) >= 5 { applyGamma(ds) }
         if let end = endsAt, now >= end { stop("Time limit reached") }
         else if let floor = c.batteryFloor, !onAC, let b = battery, b <= floor { stop("Battery at \(b)%") }
         else if let limit = c.thermalLimit, thermal >= limit { stop("Mac too hot (\(heatNow))") }
+    }
+
+    private func applyGamma(_ ds: DarkScreens) {
+        gammaApplied = Date()
+        for d in DisplayList.shared.displays where !d.builtIn {
+            if let level = ds.externals[d.uuid], level < 1 { Gamma.set(d.id, level) }
+        }
     }
 
     private func readSensors() {

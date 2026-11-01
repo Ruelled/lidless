@@ -82,12 +82,23 @@ check(dark.reopenApps, false, "dark uses its own reopen setting")
 check([dark.batteryFloor, dark.thermalLimit], [20, 2], "dark keeps the battery and heat limits")
 check(dark.lidClosed, true, "dark keeps the lid setting")
 check(Session.describe(dark), "no time limit, below 20%, at Hot, lid may close, Go Dark", "dark summary")
+// Go Dark with a setting for each display: no display sleeps, the Mac screen never goes off.
+let each = c.dark(apps: [], reopen: true, endsAfter: nil, stopOnWake: false,
+                  screens: DarkScreens(mac: 0, externals: ["A": -1, "B": 0.4, "C": 2]))
+check(each.sleepDisplay, false, "per display: no display sleeps")
+check(each.darkScreens?.mac, DarkScreens.macFloor, "per display: the Mac screen keeps one brightness step")
+check(each.darkScreens?.externals, ["A": 0, "B": 0.4, "C": 1], "per display: levels stay between 0 and 1")
+check(Session.describe(each), "no time limit, below 20%, at Hot, lid may close, Go Dark per display",
+      "per display summary")
+
 // The "Quit apps" switch. register(defaults:) keeps the values in memory, so the test writes nothing.
 // Do not call Pref.register() here: it stores a copy of the App Cleanup list.
 UserDefaults.standard.register(defaults: [Pref.darkCleanupApps: ["com.apple.Music"], Pref.darkQuitApps: true])
 check(Pref.darkConfig().cleanupApps, ["com.apple.Music"], "Go Dark quits its apps")
 UserDefaults.standard.register(defaults: [Pref.darkQuitApps: false])
 check(Pref.darkConfig().cleanupApps, [], "Go Dark with Quit apps off keeps every app open")
+UserDefaults.standard.register(defaults: [Pref.cleanupApps: ["com.apple.Music"], Pref.quitApps: false])
+check(Pref.config().cleanupApps, [], "Go Lidless with Quit apps off keeps every app open")
 
 print(failures == 0 ? "All \(checks) checks passed." : "\(failures) of \(checks) checks failed.")
 exit(failures == 0 ? 0 : 1)
