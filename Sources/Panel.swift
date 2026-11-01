@@ -40,6 +40,20 @@ enum MenuPanel {
     }
 }
 
+/// A solid button with white text. The system tint is too pale on macOS 27 for white text.
+struct BigButton: ButtonStyle {
+    let color: Color
+    @Environment(\.isEnabled) private var enabled
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.body.weight(.semibold)).foregroundStyle(.white)
+            .padding(.vertical, 9).frame(maxWidth: .infinity)
+            .background(Capsule().fill(color.opacity(configuration.isPressed ? 0.75 : 1)))
+            .contentShape(Capsule())
+            .opacity(enabled ? 1 : 0.5)
+    }
+}
+
 struct Panel: View {
     @ObservedObject var s: Session
     @ObservedObject private var caffeinate = Caffeinate.shared
@@ -65,7 +79,7 @@ struct Panel: View {
             if s.active { running } else { setup }
         }
         .padding(16)
-        .frame(width: 400)
+        .frame(width: 440)
         .fixedSize(horizontal: false, vertical: true)   // the window takes the full height, bottom padding included
         .background(WindowReader { MenuPanel.window = $0 })
     }
@@ -109,16 +123,16 @@ struct Panel: View {
         VStack(alignment: .leading, spacing: 10) {
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
                 GridRow {
-                    Text("Duration")
-                    Toggle("Stop after", isOn: $useDuration)
+                    Text("Duration").fixedSize()
+                    Toggle("Stop after", isOn: $useDuration).fixedSize()
                     Picker("", selection: $minutes) {
                         ForEach(Pref.durations, id: \.self) { Text(durationName($0)).tag($0) }
                     }.labelsHidden().disabled(!useDuration)
                     Text("")
                 }
                 GridRow {
-                    Text("Battery")
-                    Toggle("Stop below", isOn: $useBattery)
+                    Text("Battery").fixedSize()
+                    Toggle("Stop below", isOn: $useBattery).fixedSize()
                     Picker("", selection: $floor) {
                         ForEach(Pref.floors, id: \.self) { Text("\($0)%").tag($0) }
                     }.labelsHidden().disabled(!useBattery)
@@ -126,12 +140,12 @@ struct Panel: View {
                 }
                 GridRow {
                     HStack(spacing: 4) {
-                        Text("Temperature")
+                        Text("Temperature").fixedSize()
                         Button { SettingsWindow.show(.safety) } label: { Image(systemName: "info.circle") }
                             .accessibilityLabel("What the heat levels mean")
                             .buttonStyle(.borderless).help("What the heat levels mean")
                     }
-                    Toggle("Stop at", isOn: $useThermal)
+                    Toggle("Stop at", isOn: $useThermal).fixedSize()
                     Picker("", selection: $thermalLimit) {
                         ForEach(1...3, id: \.self) { Text(thermalName($0)).tag($0) }
                     }.labelsHidden().disabled(!useThermal)
@@ -173,11 +187,11 @@ struct Panel: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 6) {
                     Toggle("Keep display awake", isOn: $keepDisplay)
-                    Toggle("Put display to sleep on start", isOn: $sleepDisplay).disabled(keepDisplay)
+                    Toggle("Put display to sleep on start", isOn: $sleepDisplay).disabled(keepDisplay).fixedSize()
                 }
                 Spacer()
                 VStack(alignment: .leading, spacing: 6) {
-                    Toggle("Set brightness to minimum", isOn: $minBrightness).disabled(!Brightness.available)
+                    Toggle("Set brightness to minimum", isOn: $minBrightness).disabled(!Brightness.available).fixedSize()
                         .help(Brightness.available ? "Built-in display only. Restored when the session stops."
                                                    : "No built-in display found.")
                     Toggle("Stop when display wakes", isOn: $stopOnWake)
@@ -191,16 +205,15 @@ struct Panel: View {
                 Button { s.start(Pref.config()) } label: {
                     Label("Go Lidless", systemImage: "figure.walk").frame(maxWidth: .infinity)
                 }
-                .tint(.blue)
+                .buttonStyle(BigButton(color: Color(red: 0.11, green: 0.42, blue: 0.93)))
                 .help("Start a session with the settings above.")
                 Button { goDark() } label: {
                     Label("Go Dark", systemImage: "moon.fill").frame(maxWidth: .infinity)
                 }
-                .tint(.green)
+                .buttonStyle(BigButton(color: Color(red: 0.13, green: 0.58, blue: 0.27)))
                 .help("Start a session with the settings above, then put every display to sleep. "
                       + "External monitors go to standby. Moving the mouse wakes them; the session continues.")
             }
-            .buttonStyle(.borderedProminent).controlSize(.large)
             .padding(.bottom, 4)
         }
         .toggleStyle(.checkbox)

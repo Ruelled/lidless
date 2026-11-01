@@ -7,6 +7,9 @@
   limits and App Cleanup from the panel, closes the panel, puts every display
   to sleep and sets the built-in display to minimum brightness. A wake of a
   display does not stop a Go Dark session.
+- The two buttons are solid blue and green with white text. The system tint
+  on macOS 27 was too pale for white text.
+- The panel is 440 points wide, and no label wraps onto two lines.
 - The panel keeps its bottom padding. The button at the bottom no longer
   touches the edge of the panel.
 - `build.sh` and `test.sh` use a macOS 26 SDK when the Command Line Tools have
