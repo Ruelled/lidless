@@ -82,6 +82,12 @@ check(dark.reopenApps, false, "dark uses its own reopen setting")
 check([dark.batteryFloor, dark.thermalLimit], [20, 2], "dark keeps the battery and heat limits")
 check(dark.lidClosed, true, "dark keeps the lid setting")
 check(Session.describe(dark), "no time limit, below 20%, at Hot, lid may close, Go Dark", "dark summary")
+// The "Quit apps" switch. register(defaults:) keeps the values in memory, so the test writes nothing.
+// Do not call Pref.register() here: it stores a copy of the App Cleanup list.
+UserDefaults.standard.register(defaults: [Pref.darkCleanupApps: ["com.apple.Music"], Pref.darkQuitApps: true])
+check(Pref.darkConfig().cleanupApps, ["com.apple.Music"], "Go Dark quits its apps")
+UserDefaults.standard.register(defaults: [Pref.darkQuitApps: false])
+check(Pref.darkConfig().cleanupApps, [], "Go Dark with Quit apps off keeps every app open")
 
 print(failures == 0 ? "All \(checks) checks passed." : "\(failures) of \(checks) checks failed.")
 exit(failures == 0 ? 0 : 1)

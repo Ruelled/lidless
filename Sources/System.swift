@@ -177,6 +177,39 @@ enum AppCleanup {
     }
 }
 
+/// The displays that are on now. Go Dark puts all of them to sleep.
+struct DisplayInfo: Identifiable, Equatable {
+    let id: CGDirectDisplayID
+    let name: String
+    let builtIn: Bool
+    let pixels: String   // "3024 × 1964"
+}
+
+final class DisplayList: ObservableObject {
+    static let shared = DisplayList()
+    @Published private(set) var displays: [DisplayInfo] = []
+    private var observer: NSObjectProtocol?
+
+    private init() {
+        refresh()
+        observer = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+        ) { [weak self] _ in self?.refresh() }
+    }
+
+    func refresh() {
+        displays = NSScreen.screens.compactMap { screen in
+            guard let n = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+            else { return nil }
+            let id = CGDirectDisplayID(n.uint32Value)
+            let mode = CGDisplayCopyDisplayMode(id)
+            return DisplayInfo(id: id, name: screen.localizedName, builtIn: CGDisplayIsBuiltin(id) != 0,
+                               pixels: mode.map { "\($0.pixelWidth) × \($0.pixelHeight)" } ?? "")
+        }
+        .sorted { ($0.builtIn ? 0 : 1, $0.name) < ($1.builtIn ? 0 : 1, $1.name) }
+    }
+}
+
 final class CleanupList: ObservableObject {
     static let shared = CleanupList(key: Pref.cleanupApps)
     static let dark = CleanupList(key: Pref.darkCleanupApps)

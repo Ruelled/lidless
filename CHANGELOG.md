@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0 — 2026-11-01
+
+- The Go Dark row in the panel has a "Quit apps" switch. Switch it off, and
+  Go Dark keeps every app open. The Go Dark tab has the same setting.
+- The Go Dark tab lists the displays that go dark, with the name and the
+  resolution of each. The panel row gives the number of displays.
+- Each app list has a Deselect All button and shows how many apps are
+  selected.
+
 ## 0.6.0 — 2026-11-01
 
 - Settings has a Go Dark tab. Go Dark has its own list of apps to quit, its

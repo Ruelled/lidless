@@ -55,6 +55,7 @@ enum Pref {
     static let darkUseDuration = "darkUseDuration"
     static let darkMinutes = "darkMinutes"
     static let darkStopOnWake = "darkStopOnWake"
+    static let darkQuitApps = "darkQuitApps"
 
     static let durations = [30, 60, 120, 240, 480]
     static let floors = [10, 15, 20, 25, 30, 40, 50]
@@ -65,7 +66,7 @@ enum Pref {
             allowLid: false, keepDisplay: false, sleepDisplay: false, stopOnWake: false, minBrightness: false,
             cleanupApps: [String](), reopenApps: true, notifications: true, autoUpdate: true,
             caffeinateFlags: "dimsu", caffeinateMinutes: 0,
-            darkReopenApps: true, darkUseDuration: false, darkMinutes: 480, darkStopOnWake: false,
+            darkReopenApps: true, darkUseDuration: false, darkMinutes: 480, darkStopOnWake: false, darkQuitApps: true,
         ])
         // Go Dark starts with the App Cleanup list, once. After that the two lists are separate.
         let d = UserDefaults.standard
@@ -92,7 +93,7 @@ enum Pref {
     static func darkConfig() -> Config {
         let d = UserDefaults.standard
         return config().dark(
-            apps: d.stringArray(forKey: darkCleanupApps) ?? [],
+            apps: d.bool(forKey: darkQuitApps) ? d.stringArray(forKey: darkCleanupApps) ?? [] : [],
             reopen: d.bool(forKey: darkReopenApps),
             endsAfter: d.bool(forKey: darkUseDuration) ? TimeInterval(d.integer(forKey: darkMinutes) * 60) : nil,
             stopOnWake: d.bool(forKey: darkStopOnWake))

@@ -74,6 +74,8 @@ struct Panel: View {
     @ObservedObject private var darkApps = CleanupList.dark
     @AppStorage(Pref.darkUseDuration) private var darkUseDuration = false
     @AppStorage(Pref.darkMinutes) private var darkMinutes = 480
+    @AppStorage(Pref.darkQuitApps) private var darkQuitApps = true
+    @ObservedObject private var screens = DisplayList.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -173,20 +175,29 @@ struct Panel: View {
                     Image(systemName: "chevron.right").foregroundStyle(.secondary)
                 }.contentShape(Rectangle())
             }.buttonStyle(.plain)
-            Button { SettingsWindow.show(.dark) } label: {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Go Dark")
-                        Text([darkApps.ids.isEmpty ? "No apps quit"
-                              : "\(darkApps.ids.count) app\(darkApps.ids.count == 1 ? "" : "s") quit",
-                              darkUseDuration ? "stops after \(durationName(darkMinutes))" : "no time limit",
-                              "every display sleeps"].joined(separator: " · "))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
+            HStack {
+                Button { SettingsWindow.show(.dark) } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Go Dark")
+                            Text([darkQuitApps ? (darkApps.ids.isEmpty ? "no apps selected"
+                                    : "\(darkApps.ids.count) app\(darkApps.ids.count == 1 ? "" : "s") quit")
+                                  : "all apps stay open",
+                                  darkUseDuration ? "stops after \(durationName(darkMinutes))" : "no time limit",
+                                  "\(screens.displays.count) display\(screens.displays.count == 1 ? "" : "s") sleep"]
+                                 .joined(separator: " · "))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }.contentShape(Rectangle())
+                }.buttonStyle(.plain)
+                .help(screens.displays.map(\.name).joined(separator: ", "))
+                Toggle("Quit apps", isOn: $darkQuitApps).toggleStyle(.switch).controlSize(.mini)
+                    .help("Off: Go Dark keeps every app open.")
+                Button { SettingsWindow.show(.dark) } label: {
                     Image(systemName: "chevron.right").foregroundStyle(.secondary)
-                }.contentShape(Rectangle())
-            }.buttonStyle(.plain)
+                }.buttonStyle(.plain).accessibilityLabel("Go Dark settings")
+            }
             Divider()
             Toggle("Allow the lid to close (also on battery)", isOn: $lidClosed)
             if lidClosed {

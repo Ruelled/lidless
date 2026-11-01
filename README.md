@@ -27,7 +27,8 @@ laptop is in your bag. It is a free, open-source take on the idea behind
 - **Go Lidless and Go Dark**: two buttons start a session. Go Lidless uses
   the settings in the panel. Go Dark is for the night and has its own tab in
   Settings: its own list of apps to quit, its own time limit (none by
-  default), and an option to stop when a display wakes. It puts every display
+  default), a "Quit apps" switch, the list of displays that go dark, and an
+  option to stop when a display wakes. It puts every display
   to sleep with `pmset displaysleepnow`, so external monitors go to standby.
   Go Dark does not dim the Mac screen. Any key, F2 too, wakes the displays at
   their normal brightness, and the session continues. All displays wake

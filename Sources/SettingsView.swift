@@ -45,7 +45,7 @@ struct SettingsView: View {
             AgentsTab().tabItem { Label("Agents", systemImage: "terminal") }.tag(SettingsTab.agents)
         }
         .padding(20)
-        .frame(width: 580, height: 560)
+        .frame(width: 580, height: 680)
     }
 }
 
@@ -355,8 +355,10 @@ private struct AppPicker: View {
         }
         .toggleStyle(.checkbox)
         HStack {
-            Text("Memory column: physical footprint now.").font(.caption).foregroundStyle(.secondary)
+            Text("\(list.ids.count) selected. Memory column: physical footprint now.")
+                .font(.caption).foregroundStyle(.secondary)
             Spacer()
+            Button("Deselect All") { list.ids = [] }.disabled(list.ids.isEmpty)
             Button("Refresh") { apps = AppCleanup.candidates() }
         }
     }
@@ -365,20 +367,38 @@ private struct AppPicker: View {
 // MARK: - Go Dark
 
 private struct DarkTab: View {
+    @ObservedObject private var screens = DisplayList.shared
     @AppStorage(Pref.darkReopenApps) private var reopen = true
     @AppStorage(Pref.darkUseDuration) private var useDuration = false
     @AppStorage(Pref.darkMinutes) private var minutes = 480
     @AppStorage(Pref.darkStopOnWake) private var stopOnWake = false
+    @AppStorage(Pref.darkQuitApps) private var quitApps = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Go Dark is for the night. It starts a session, quits the apps below and puts every display "
-                 + "to sleep, also each external monitor.").bold().fixedSize(horizontal: false, vertical: true)
+                 + "to sleep.").bold().fixedSize(horizontal: false, vertical: true)
             Text("Press any key to wake the displays, for example F2 on the MacBook. The Mac screen comes back "
-                 + "at its normal brightness. All displays wake together: macOS cannot wake only one.")
+                 + "at its normal brightness. The battery limit, the heat limit and \"Allow the lid to close\" "
+                 + "come from the panel.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            Text("The battery limit, the heat limit and \"Allow the lid to close\" come from the panel.")
-                .font(.caption).foregroundStyle(.secondary)
+            GroupBox {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(screens.displays) { d in
+                        HStack {
+                            Image(systemName: d.builtIn ? "laptopcomputer" : "display")
+                                .frame(width: 20).foregroundStyle(.secondary)
+                            Text(d.name + (d.builtIn ? " (Mac screen)" : ""))
+                            Spacer()
+                            Text(d.pixels).foregroundStyle(.secondary).monospacedDigit()
+                        }
+                    }
+                    if screens.displays.isEmpty { Text("No display found.").foregroundStyle(.secondary) }
+                    Text("All of them sleep and all of them wake together. macOS cannot put only one to sleep. "
+                         + "A display that is off or not connected now is not in this list.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+            } label: { Text("Displays that go dark: \(screens.displays.count)") }
             HStack {
                 Toggle("Stop after", isOn: $useDuration)
                 Picker("", selection: $minutes) {
@@ -388,13 +408,16 @@ private struct DarkTab: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Toggle("Stop Go Dark when a display wakes", isOn: $stopOnWake)
-            Toggle("Reopen these apps when Go Dark stops", isOn: $reopen)
-            Text("Apps to quit when you click Go Dark:")
+            HStack(spacing: 16) {
+                Toggle("Quit the apps below", isOn: $quitApps)
+                Toggle("Reopen them when Go Dark stops", isOn: $reopen).disabled(!quitApps)
+            }
             Text("Do not select the app that runs your agent, for example your terminal.")
                 .font(.caption).foregroundStyle(.orange)
-            AppPicker(list: CleanupList.dark)
+            AppPicker(list: CleanupList.dark).disabled(!quitApps).opacity(quitApps ? 1 : 0.5)
         }
         .toggleStyle(.checkbox)
+        .onAppear { screens.refresh() }
     }
 }
 
