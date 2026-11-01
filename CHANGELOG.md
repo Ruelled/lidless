@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.10.0 — 2026-11-01
+
+- Releases: each version tag builds a zip of Lidless.app on GitHub Actions
+  and publishes it on GitHub Releases, with a SHA-256 checksum and these
+  notes. People can download Lidless without the Xcode tools.
+- A downloaded copy checks the newest release for updates, and its Settings
+  open the download page. A copy built with `build.sh` still compares its
+  commit with `main` and gives the `git pull` command.
+
 ## 0.9.1 — 2026-11-01
 
 - Settings > Go Dark warns that "All displays sleep" can lock the screen and

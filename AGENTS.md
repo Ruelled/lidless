@@ -57,5 +57,9 @@ when the app crashes, also with `.forAppOnly`; this was tested 2026-11-01.
 Keep the saved list, the watchdog and the restore at launch. Never turn off
 the built-in display, and turn off externals only while it is on.
 
+Release: set `version` in `build.sh`, add a `## <version>` section to
+`CHANGELOG.md`, commit, then push the tag `v<version>`. The `release` workflow
+tests, builds with `LIDLESS_CHANNEL=release`, and publishes the zip.
+
 Build with Command Line Tools 27: they have no SwiftUI macro plugin, so
 `sdk.sh` selects a macOS 26 SDK.

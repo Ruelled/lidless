@@ -45,6 +45,23 @@ laptop is in your bag. It is a free, open-source take on the idea behind
 
 Requires macOS 13 or later. Apple silicon and Intel.
 
+### Download
+
+1. Download `Lidless-<version>.zip` from the
+   [latest release](https://github.com/Ruelled/lidless/releases/latest) and open it.
+2. Move `Lidless.app` to your Applications folder, then open it.
+3. macOS says that it cannot check the app, because Lidless is not notarized
+   by Apple. Open **System Settings > Privacy & Security**, scroll down, and
+   click **Open Anyway**. Or run once in Terminal:
+   `xattr -dr com.apple.quarantine /Applications/Lidless.app`
+4. For the `lidless` command, open Lidless **Settings > Agents** and click
+   **Install**.
+
+A downloaded copy checks GitHub Releases for updates. To update, quit Lidless
+and replace the app with the new one.
+
+### Build from source
+
 ```sh
 git clone https://github.com/Ruelled/lidless.git
 cd lidless

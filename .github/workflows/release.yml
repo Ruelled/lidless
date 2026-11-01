@@ -1,0 +1,46 @@
+name: release
+# Push a tag such as v0.10.0 to publish a release. The tag must match `version` in build.sh,
+# and CHANGELOG.md must have a "## 0.10.0" section: it becomes the release notes.
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./test.sh
+      - run: LIDLESS_CHANNEL=release ./build.sh --no-install
+      - name: Check that the tag matches the app version
+        run: |
+          v=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" build/Lidless.app/Contents/Info.plist)
+          [ "v$v" = "$GITHUB_REF_NAME" ] || { echo "Tag $GITHUB_REF_NAME does not match version $v in build.sh"; exit 1; }
+      - name: Package
+        run: |
+          cd build
+          ditto -c -k --keepParent Lidless.app "Lidless-$GITHUB_REF_NAME.zip"
+          shasum -a 256 "Lidless-$GITHUB_REF_NAME.zip" > "Lidless-$GITHUB_REF_NAME.zip.sha256"
+      - name: Release notes from CHANGELOG.md
+        run: |
+          awk -v v="${GITHUB_REF_NAME#v}" 'index($0, "## " v " ") == 1 {f=1; next} /^## / && f {exit} f' CHANGELOG.md > notes.md
+          [ -s notes.md ] || { echo "CHANGELOG.md has no section for ${GITHUB_REF_NAME#v}"; exit 1; }
+          cat >> notes.md <<'EOF'
+
+          ## Install
+
+          1. Download `Lidless-<version>.zip` below and open it.
+          2. Move `Lidless.app` to your Applications folder, then open it.
+          3. macOS says that it cannot check the app, because Lidless is not notarized by Apple.
+             Open **System Settings > Privacy & Security**, scroll down, and click **Open Anyway**.
+             Or run once in Terminal: `xattr -dr com.apple.quarantine /Applications/Lidless.app`
+          4. For the `lidless` command, open Lidless **Settings > Agents** and click **Install**.
+
+          To update: quit Lidless, then replace the app with the new one.
+          Check the download: `shasum -a 256 -c Lidless-<version>.zip.sha256`
+          EOF
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" build/Lidless-*.zip build/Lidless-*.zip.sha256 --title "Lidless $GITHUB_REF_NAME" --notes-file notes.md

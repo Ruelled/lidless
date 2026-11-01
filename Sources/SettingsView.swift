@@ -80,7 +80,14 @@ private struct GeneralTab: View {
                     Spacer()
                     Button(u.checking ? "Checking…" : "Check Now") { u.check() }.disabled(u.checking)
                 }
-                if u.available {
+                if u.available && u.isRelease {
+                    HStack {
+                        Text("Download the new version, quit Lidless, and replace the app.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Open Download Page") { NSWorkspace.shared.open(Updates.releasesPage) }
+                    }
+                } else if u.available {
                     HStack {
                         Text(u.updateCommand).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
                         Spacer()

@@ -94,6 +94,13 @@ check(offOne.darkScreens?.off, ["A"], "per display: the displays to turn off pas
 check(Session.describe(each), "no time limit, below 20%, at Hot, lid may close, Go Dark per display",
       "per display summary")
 
+// Version compare for the release update check.
+check(isNewer("v0.10.0", than: "0.9.1"), true, "0.10.0 is newer than 0.9.1 (numbers, not text)")
+check(isNewer("v0.9.1", than: "0.9.1"), false, "same version")
+check(isNewer("0.9", than: "0.9.0"), false, "a missing part counts as 0")
+check(isNewer("v1.0.0", than: "0.99.9"), true, "major version")
+check(isNewer("v0.9.0", than: "0.10.0"), false, "older version")
+
 // The Go Dark display summary in the panel.
 check(darkDisplaySummary(perDisplay: false, displays: 3, mac: 0.06, externals: [nil, 0]), "3 displays sleep",
       "summary, all sleep")

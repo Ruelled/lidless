@@ -37,6 +37,9 @@ final class Updates: ObservableObject {
     var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?" }
     var sourceDir: String { Bundle.main.object(forInfoDictionaryKey: "LidlessSource") as? String ?? "lidless" }
     var updateCommand: String { "cd \"\(sourceDir)\" && git pull && ./build.sh" }
+    /// "release": a download from GitHub Releases. "source": built on this Mac with build.sh.
+    var isRelease: Bool { Bundle.main.object(forInfoDictionaryKey: "LidlessChannel") as? String == "release" }
+    static let releasesPage = URL(string: "https://github.com/\(repo)/releases/latest")!
 
     func startAutoCheck() {
         let t = Timer(timeInterval: 24 * 3600, repeats: true) { [weak self] _ in self?.autoCheck() }
@@ -50,6 +53,29 @@ final class Updates: ObservableObject {
     }
 
     func check() {
+        if isRelease { checkRelease() } else { checkCommit() }
+    }
+
+    /// A release build compares its version with the newest GitHub release.
+    private func checkRelease() {
+        checking = true
+        var req = URLRequest(url: URL(string: "https://api.github.com/repos/\(Self.repo)/releases/latest")!)
+        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        URLSession.shared.dataTask(with: req) { data, response, _ in
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let tag = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["tag_name"] as? String
+            DispatchQueue.main.async {
+                self.checking = false
+                guard code == 200, let tag else { self.status = "Check failed (HTTP \(code))."; return }
+                self.available = isNewer(tag, than: self.version)
+                self.status = (self.available ? "Version \(tag.dropFirst(tag.hasPrefix("v") ? 1 : 0)) is available."
+                                              : "Up to date.") + " Checked at \(shortTime(Date()))."
+            }
+        }.resume()
+    }
+
+    /// A build from source compares its commit with the newest commit on main.
+    private func checkCommit() {
         guard commit.count == 40 else { status = "This build has no git commit, so it cannot compare."; return }
         checking = true
         var req = URLRequest(url: URL(string: "https://api.github.com/repos/\(Self.repo)/commits/main")!)
@@ -66,6 +92,19 @@ final class Updates: ObservableObject {
             }
         }.resume()
     }
+}
+
+/// True when version a ("v0.10.0" or "0.10.0") is newer than b. Compares number by number.
+func isNewer(_ a: String, than b: String) -> Bool {
+    func parts(_ v: String) -> [Int] {
+        (v.hasPrefix("v") ? String(v.dropFirst()) : v).split(separator: ".").map { Int($0) ?? 0 }
+    }
+    let x = parts(a), y = parts(b)
+    for i in 0..<max(x.count, y.count) {
+        let p = i < x.count ? x[i] : 0, q = i < y.count ? y[i] : 0
+        if p != q { return p > q }
+    }
+    return false
 }
 
 // MARK: - The `lidless` command (a small shell wrapper around the app binary)

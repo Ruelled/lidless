@@ -6,7 +6,7 @@ set -eu
 cd "$(dirname "$0")"
 . ./sdk.sh
 command -v swiftc >/dev/null || { echo "swiftc not found. Install the Xcode Command Line Tools: xcode-select --install"; exit 1; }
-version=0.9.1
+version=0.10.0
 commit=$(git rev-parse HEAD 2>/dev/null || echo unknown)
 app=build/Lidless.app
 rm -rf "$app"
@@ -34,6 +34,7 @@ cat > "$app/Contents/Info.plist" <<EOF
   <key>LSUIElement</key><true/>
   <key>LidlessCommit</key><string>$commit</string>
   <key>LidlessSource</key><string>$(pwd)</string>
+  <key>LidlessChannel</key><string>${LIDLESS_CHANNEL:-source}</string>
 </dict></plist>
 EOF
 codesign --force -s - "$app"
