@@ -8,6 +8,7 @@ struct DarkScreens: Equatable {
     static let macFloor: Float = 1.0 / 16
     var mac: Float                    // brightness of the Mac screen, macFloor...1
     var externals: [String: Double]   // display UUID -> level: 0 black, 1 unchanged
+    var off: Set<String> = []         // display UUIDs to turn off; the level applies if macOS refuses
 }
 
 struct Config {
@@ -34,7 +35,8 @@ struct Config {
         var c = self
         c.dark = true
         c.darkScreens = screens.map { DarkScreens(mac: max(DarkScreens.macFloor, min(1, $0.mac)),
-                                                  externals: $0.externals.mapValues { max(0, min(1, $0)) }) }
+                                                  externals: $0.externals.mapValues { max(0, min(1, $0)) },
+                                                  off: $0.off) }
         c.keepDisplay = false
         c.sleepDisplay = screens == nil
         c.minBrightness = false
@@ -73,6 +75,7 @@ enum Pref {
     static let darkPerDisplay = "darkPerDisplay"
     static let darkMacBrightness = "darkMacBrightness"
     static let darkLevels = "darkDisplayLevels"
+    static let darkOff = "darkDisplayOff"
     static let quitApps = "quitApps"
 
     static let durations = [30, 60, 120, 240, 480]
@@ -130,9 +133,21 @@ enum Pref {
         UserDefaults.standard.set(all, forKey: darkLevels)
     }
 
+    /// Turn an external display off in Go Dark. On by default.
+    static func darkTurnOff(_ uuid: String) -> Bool {
+        (UserDefaults.standard.dictionary(forKey: darkOff) as? [String: Bool])?[uuid] ?? true
+    }
+
+    static func setDarkTurnOff(_ uuid: String, _ on: Bool) {
+        var all = UserDefaults.standard.dictionary(forKey: darkOff) as? [String: Bool] ?? [:]
+        all[uuid] = on
+        UserDefaults.standard.set(all, forKey: darkOff)
+    }
+
     static func darkScreens() -> DarkScreens {
         let ext = DisplayList.shared.displays.filter { !$0.builtIn }
         return DarkScreens(mac: Float(UserDefaults.standard.double(forKey: darkMacBrightness)),
-                           externals: Dictionary(uniqueKeysWithValues: ext.map { ($0.uuid, darkLevel($0.uuid)) }))
+                           externals: Dictionary(uniqueKeysWithValues: ext.map { ($0.uuid, darkLevel($0.uuid)) }),
+                           off: Set(ext.filter { darkTurnOff($0.uuid) }.map(\.uuid)))
     }
 }

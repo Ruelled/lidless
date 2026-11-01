@@ -34,6 +34,7 @@ final class Session: ObservableObject {
     private var activity: NSObjectProtocol?
     private var savedBrightness: Float?
     private var gammaApplied = Date.distantPast
+    private var displayWatchdog: Process?
     private var watchdog: Process?
     private var wakeObserver: NSObjectProtocol?
     private var sleepObserver: NSObjectProtocol?
@@ -52,6 +53,9 @@ final class Session: ObservableObject {
         if Lid.ownsSleepDisabled {   // a crash or a failed restore left lid sleep off
             if Lid.setDisableSleep(false) { Lid.ownsSleepDisabled = false }
             Log.write("Restored lid sleep that an earlier run left disabled")
+        }
+        if !DisplayPower.owned.isEmpty {   // a crash left displays off
+            Log.write("Turned on \(DisplayPower.restoreOwned()) display(s) that an earlier run left off")
         }
         readSensors()
         // .common: the guardrail check also runs while a menu or a picker is open.
@@ -110,6 +114,7 @@ final class Session: ObservableObject {
         if c.minBrightness, let b = Brightness.get(), Brightness.set(0) { savedBrightness = b }
         if let ds = c.darkScreens {
             if let b = Brightness.get(), Brightness.set(ds.mac) { savedBrightness = b }
+            turnOffDisplays(ds)
             applyGamma(ds)
         }
         if c.sleepDisplay && !c.keepDisplay {
@@ -172,6 +177,7 @@ final class Session: ObservableObject {
         if let b = savedBrightness { Brightness.set(b) }
         savedBrightness = nil
         if config?.darkScreens != nil { Gamma.restoreAll() }
+        restoreDisplays()
         AppCleanup.reopen(appsToReopen)
         appsToReopen = []
         holders = []
@@ -252,8 +258,28 @@ final class Session: ObservableObject {
     private func applyGamma(_ ds: DarkScreens) {
         gammaApplied = Date()
         for d in DisplayList.shared.displays where !d.builtIn {
-            if let level = ds.externals[d.uuid], level < 1 { Gamma.set(d.id, level) }
+            // A display to turn off that is still on (macOS refused): make it black instead.
+            let level = ds.off.contains(d.uuid) ? 0 : ds.externals[d.uuid] ?? 1
+            if level < 1 { Gamma.set(d.id, level) }
         }
+    }
+
+    /// Turns off the chosen external displays, but only while the Mac screen is on, so that one
+    /// display always stays on.
+    private func turnOffDisplays(_ ds: DarkScreens) {
+        let all = DisplayList.shared.displays
+        guard !ds.off.isEmpty, all.contains(where: \.builtIn) else { return }
+        let ids = all.filter { !$0.builtIn && ds.off.contains($0.uuid) }.map(\.id)
+        let done = ids.filter { DisplayPower.set($0, on: false) }
+        DisplayPower.owned = done
+        displayWatchdog = DisplayPower.startWatchdog(done)
+        Log.write("Go Dark turned off \(done.count) of \(ids.count) display(s)")
+    }
+
+    private func restoreDisplays() {
+        displayWatchdog?.terminate()
+        displayWatchdog = nil
+        if !DisplayPower.owned.isEmpty { Log.write("Turned on \(DisplayPower.restoreOwned()) display(s)") }
     }
 
     private func readSensors() {

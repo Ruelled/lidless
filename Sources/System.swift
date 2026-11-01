@@ -197,6 +197,59 @@ enum Gamma {
     static func restoreAll() { CGDisplayRestoreColorSyncSettings() }
 }
 
+/// Turns an external display off the same way as pulling its cable: macOS stops the signal and the
+/// monitor goes to standby. Works without DDC.
+/// A test on 2026-11-01 showed that macOS does NOT connect the display again when the app crashes,
+/// also with the "app only" option. So Lidless saves what it turned off, runs a watchdog that turns it
+/// on again when Lidless dies, and turns it on again at the next launch. A logout also connects it.
+enum DisplayPower {
+    private typealias EnableFn = @convention(c) (CGDisplayConfigRef?, CGDirectDisplayID, Bool) -> CGError
+    private static let enableFn: EnableFn? = {
+        guard let h = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY),
+              let sym = dlsym(h, "CGSConfigureDisplayEnabled") else { return nil }
+        return unsafeBitCast(sym, to: EnableFn.self)
+    }()
+    private static let ownedKey = "displaysTurnedOffByLidless"
+
+    static var available: Bool { enableFn != nil }
+
+    /// The displays that Lidless turned off and must turn on again. Saved for the next launch.
+    static var owned: [CGDirectDisplayID] {
+        get { (UserDefaults.standard.array(forKey: ownedKey) as? [Int] ?? []).map { CGDirectDisplayID($0) } }
+        set { UserDefaults.standard.set(newValue.map { Int($0) }, forKey: ownedKey) }
+    }
+
+    /// Returns true when macOS accepted the change. Never turns off the Mac screen.
+    @discardableResult
+    static func set(_ id: CGDirectDisplayID, on: Bool) -> Bool {
+        guard let fn = enableFn, CGDisplayIsBuiltin(id) == 0 else { return false }
+        var cfg: CGDisplayConfigRef?
+        guard CGBeginDisplayConfiguration(&cfg) == .success else { return false }
+        guard fn(cfg, id, on) == .success else { CGCancelDisplayConfiguration(cfg); return false }
+        return CGCompleteDisplayConfiguration(cfg, .forSession) == .success
+    }
+
+    /// Turns on every display that Lidless turned off. Returns how many it turned on.
+    @discardableResult
+    static func restoreOwned() -> Int {
+        let ids = owned
+        let back = ids.filter { set($0, on: true) }
+        owned = ids.filter { !back.contains($0) }
+        return back.count
+    }
+
+    /// A shell that waits for this process to exit and then turns the displays on again. Covers a crash
+    /// or a force quit. It runs this same binary with the hidden `displays-on` command.
+    static func startWatchdog(_ ids: [CGDirectDisplayID]) -> Process? {
+        guard let exe = Bundle.main.executablePath, !ids.isEmpty else { return nil }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        p.arguments = ["-c", "while kill -0 \(ProcessInfo.processInfo.processIdentifier) 2>/dev/null; do sleep 2; done; "
+                       + "'\(exe)' displays-on " + ids.map(String.init).joined(separator: " ")]
+        return (try? p.run()) == nil ? nil : p
+    }
+}
+
 final class DisplayList: ObservableObject {
     static let shared = DisplayList()
     @Published private(set) var displays: [DisplayInfo] = []

@@ -88,6 +88,9 @@ let each = c.dark(apps: [], reopen: true, endsAfter: nil, stopOnWake: false,
 check(each.sleepDisplay, false, "per display: no display sleeps")
 check(each.darkScreens?.mac, DarkScreens.macFloor, "per display: the Mac screen keeps one brightness step")
 check(each.darkScreens?.externals, ["A": 0, "B": 0.4, "C": 1], "per display: levels stay between 0 and 1")
+let offOne = c.dark(apps: [], reopen: true, endsAfter: nil, stopOnWake: false,
+                    screens: DarkScreens(mac: 0.5, externals: ["A": 0.3], off: ["A"]))
+check(offOne.darkScreens?.off, ["A"], "per display: the displays to turn off pass through")
 check(Session.describe(each), "no time limit, below 20%, at Hot, lid may close, Go Dark per display",
       "per display summary")
 

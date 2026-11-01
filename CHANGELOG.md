@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.0 — 2026-11-01
+
+- Go Dark, "A setting for each display": each external display has a
+  **Turn off** checkbox, on by default. Lidless stops the signal to the
+  monitor, the same as pulling its cable, and the monitor goes to standby.
+  This works without DDC. Clear the checkbox to use the Black-to-Unchanged
+  slider. If macOS refuses to turn a display off, Lidless makes it black.
+- Lidless turns a display off only while the Mac screen is on, so one display
+  always stays on. It never turns off the Mac screen.
+- A test showed that macOS does not connect a display again when the app
+  that turned it off crashes. So Lidless saves the displays that it turned
+  off, runs a watchdog that turns them on again when Lidless dies, and turns
+  them on again at the next launch. A logout also turns them on.
+
 ## 0.8.0 — 2026-11-01
 
 - App Cleanup is now **Go Lidless**: the tab and the panel row have the new

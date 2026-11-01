@@ -32,7 +32,9 @@ laptop is in your bag. It is a free, open-source take on the idea behind
   to sleep with `pmset displaysleepnow`, so external monitors go to standby.
   With "A setting for each display", no display sleeps: the Mac screen gets a
   brightness slider that cannot go below 6%, and each external display gets
-  a slider from Black to Unchanged.
+  a "Turn off" checkbox (the monitor goes to standby, as with a pulled cable)
+  or a slider from Black to Unchanged. A watchdog turns the displays on again
+  if Lidless crashes.
   Go Dark does not dim the Mac screen in "All displays sleep" mode. Any key, F2 too, wakes the displays at
   their normal brightness, and the session continues. All displays wake
   together, because macOS cannot wake only one.

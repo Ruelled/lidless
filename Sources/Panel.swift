@@ -228,11 +228,14 @@ struct Panel: View {
     private var darkDisplays: String {
         let n = screens.displays.count
         guard darkPerDisplay else { return "\(n) display\(n == 1 ? "" : "s") sleep" }
-        let ext = screens.displays.filter { !$0.builtIn }.map { Pref.darkLevel($0.uuid) }
+        let all = screens.displays.filter { !$0.builtIn }
+        let offCount = DisplayPower.available ? all.filter { Pref.darkTurnOff($0.uuid) }.count : 0
+        let ext = all.filter { !(DisplayPower.available && Pref.darkTurnOff($0.uuid)) }.map { Pref.darkLevel($0.uuid) }
         let black = ext.filter { $0 <= 0.005 }.count, same = ext.filter { $0 >= 0.995 }.count
         let dim = ext.count - black - same
         return (["Mac \(Int((darkMac * 100).rounded()))%"]
-                + [black > 0 ? "\(black) black" : nil, dim > 0 ? "\(dim) dim" : nil].compactMap { $0 })
+                + [offCount > 0 ? "\(offCount) off" : nil, black > 0 ? "\(black) black" : nil,
+                   dim > 0 ? "\(dim) dim" : nil].compactMap { $0 })
             .joined(separator: " · ")
     }
 

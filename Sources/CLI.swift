@@ -5,7 +5,7 @@ import AppKit
 
 enum CLI {
     static let commands: Set<String> = ["start", "stop", "status", "caffeinate", "settings", "install", "version",
-                                        "help", "--help", "-h", "--version"]
+                                        "help", "--help", "-h", "--version", "displays-on"]
 
     static let usage = """
     Usage: lidless <command> [options]
@@ -52,6 +52,11 @@ enum CLI {
             return send(["cmd": "settings", "tab": rest.first ?? SettingsTab.general.rawValue], json: json)
         case "install":
             return install()
+        case "displays-on":   // hidden: the watchdog runs it after a crash
+            let ids = rest.compactMap { UInt32($0) }
+            ids.forEach { DisplayPower.set(CGDirectDisplayID($0), on: true) }
+            DisplayPower.owned = DisplayPower.owned.filter { !ids.contains($0) }
+            return 0
         case "status":
             return status(json: json)
         case "version", "--version":

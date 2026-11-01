@@ -397,9 +397,10 @@ private struct DarkTab: View {
                     ForEach(screens.displays) { d in DisplayRow(d: d, perDisplay: perDisplay) }
                     if screens.displays.isEmpty { Text("No display found.").foregroundStyle(.secondary) }
                     Text(perDisplay
-                         ? "No display sleeps. The Mac screen stays on at its brightness, so F2 makes it brighter "
-                           + "at once. It can never go off. An external display goes black or dim; its backlight "
-                           + "stays on. Every display comes back when Go Dark stops."
+                         ? "The Mac screen stays on at its brightness, so F2 makes it brighter at once. It can "
+                           + "never go off. \"Turn off\" stops the signal to a monitor, the same as pulling its "
+                           + "cable, and the monitor goes to standby. macOS moves its windows to the other displays. "
+                           + "Black or dim keeps the backlight on. Every display comes back when Go Dark stops."
                          : "All displays sleep and all wake together when you press a key. macOS cannot put "
                            + "only one to sleep. Choose \"A setting for each display\" to keep the Mac screen on.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -435,6 +436,7 @@ private struct DisplayRow: View {
     let perDisplay: Bool
     @AppStorage(Pref.darkMacBrightness) private var mac = Double(DarkScreens.macFloor)
     @State private var level = 0.0
+    @State private var off = true
 
     var body: some View {
         HStack {
@@ -449,14 +451,18 @@ private struct DisplayRow: View {
                 Text("Sleeps").foregroundStyle(.secondary)
             } else if d.builtIn {
                 Slider(value: $mac, in: Double(DarkScreens.macFloor)...1)
-                Text("Brightness \(Int((mac * 100).rounded()))%").monospacedDigit().frame(width: 110, alignment: .trailing)
+                Text("Brightness \(Int((mac * 100).rounded()))%").monospacedDigit().frame(width: 120, alignment: .trailing)
             } else {
+                Toggle("Turn off", isOn: Binding(get: { off }, set: { off = $0; Pref.setDarkTurnOff(d.uuid, $0) }))
+                    .disabled(!DisplayPower.available)
                 Slider(value: Binding(get: { level }, set: { level = $0; Pref.setDarkLevel(d.uuid, $0) }), in: 0...1)
-                Text(level <= 0.005 ? "Black" : level >= 0.995 ? "Unchanged" : "Dim \(Int((level * 100).rounded()))%")
-                    .monospacedDigit().frame(width: 110, alignment: .trailing)
+                    .disabled(off)
+                Text(off ? "Off" : level <= 0.005 ? "Black" : level >= 0.995 ? "Unchanged"
+                     : "Dim \(Int((level * 100).rounded()))%")
+                    .monospacedDigit().frame(width: 90, alignment: .trailing)
             }
         }
-        .onAppear { level = Pref.darkLevel(d.uuid) }
+        .onAppear { level = Pref.darkLevel(d.uuid); off = Pref.darkTurnOff(d.uuid) && DisplayPower.available }
     }
 }
 
