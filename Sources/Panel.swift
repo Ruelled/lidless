@@ -96,16 +96,18 @@ struct Panel: View {
         HStack {
             Image(systemName: "figure.walk")
             Text("Lidless").font(.title3.bold())
+            // Settings sits on the left, with a text label, far from the Quit button on the right.
+            Button { SettingsWindow.show() } label: {
+                Label(updates.available ? "Settings · Update" : "Settings",
+                      systemImage: updates.available ? "gearshape.arrow.triangle.2.circlepath" : "gearshape")
+            }
+            .buttonStyle(.bordered).controlSize(.small)
+            .help(updates.available ? "Open Settings. An update is available." : "Open Settings")
             Spacer()
             Toggle("Caffeinate", isOn: Binding(get: { caffeinate.on }, set: { caffeinate.set($0) }))
                 .toggleStyle(.switch).controlSize(.small)
                 .help("Runs caffeinate \(Caffeinate.savedArgs().joined(separator: " ")). "
                       + "Change it in Settings > Caffeinate.")
-            Button { SettingsWindow.show() } label: {
-                Image(systemName: updates.available ? "gearshape.arrow.triangle.2.circlepath" : "gearshape")
-            }
-            .accessibilityLabel(updates.available ? "Settings, update available" : "Settings")
-            .buttonStyle(.borderless).help(updates.available ? "Settings (update available)" : "Settings")
             Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }
                 .accessibilityLabel("Quit Lidless")
                 .buttonStyle(.borderless).help("Quit (ends the session)")

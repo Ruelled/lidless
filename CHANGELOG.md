@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.2 — 2026-11-02
+
+- Panel: the Settings button has a text label and sits next to the name, on
+  the left. The Quit button stays alone on the right, so you cannot click one
+  for the other.
+
 ## 0.10.1 — 2026-11-01
 
 - Releases are signed with Developer ID and notarized by Apple, so a
